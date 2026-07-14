@@ -1,0 +1,26 @@
+name: Coleta semanal do Radar Odisse
+
+on:
+  schedule:
+    # Toda segunda-feira às 08:00 UTC (05:00 em João Pessoa)
+    - cron: '0 8 * * 1'
+  workflow_dispatch: {} # permite rodar manualmente pela aba Actions
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar todos os parsers e enviar pro Worker
+        env:
+          WORKER_URL: ${{ secrets.RADAR_WORKER_URL }}
+          COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
+        run: node scripts/collect-and-send.js

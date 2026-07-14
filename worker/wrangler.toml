@@ -1,0 +1,13 @@
+name = "radar-odisse-worker"
+main = "index.js"
+compatibility_date = "2026-07-01"
+
+# Depois de criar os namespaces (wrangler kv namespace create CONCURSOS / REVISAO),
+# troque os ids abaixo pelos reais.
+kv_namespaces = [
+  { binding = "CONCURSOS", id = "SUBSTITUIR_PELO_ID_REAL" },
+  { binding = "REVISAO", id = "SUBSTITUIR_PELO_ID_REAL" },
+]
+
+# Defina com: wrangler secret put COLLECT_SECRET
+# (não coloque o valor real aqui — isso fica no dashboard/CLI da Cloudflare)

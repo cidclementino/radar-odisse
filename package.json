@@ -1,0 +1,17 @@
+{
+  "name": "radar-odisse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Painel interno de monitoramento de concursos de arquitetura, urbanismo, paisagismo e design — Odisse Estúdio",
+  "main": "index.js",
+  "scripts": {
+    "collect": "node scripts/collect-and-send.js",
+    "parse:concursosdeprojeto": "node parsers/concursosdeprojeto.js"
+  },
+  "keywords": [],
+  "author": "Odisse Estúdio de Arquitetura e Design",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "rss-parser": "^3.13.0"
+  }
+}

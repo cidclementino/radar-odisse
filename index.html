@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radar Odisse — Concursos de Arquitetura</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__brand">
+      <span class="topbar__mark">◎</span>
+      <div class="topbar__title">
+        <h1>Radar Odisse</h1>
+        <p>Concursos e editais em monitoramento</p>
+      </div>
+    </div>
+
+    <div class="topbar__controls">
+      <label class="toggle">
+        <input type="checkbox" id="toggle-all">
+        <span class="toggle__track"><span class="toggle__thumb"></span></span>
+        <span class="toggle__label">Mostrar todos (inclui descartados e inscritos)</span>
+      </label>
+    </div>
+  </header>
+
+  <main class="stack" id="stack" aria-live="polite">
+    <!-- cards injected here -->
+  </main>
+
+  <p class="empty-state" id="empty-state" hidden>
+    Nenhum concurso em monitoramento no momento. Ajuste o filtro acima para ver o histórico completo.
+  </p>
+
+  <footer class="footer">
+    <span id="footer-count"></span> · atualizado semanalmente via GitHub Actions
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

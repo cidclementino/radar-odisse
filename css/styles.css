@@ -1,0 +1,289 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  --ink: #16223d;
+  --ink-soft: #3c4a68;
+  --paper: #efece1;
+  --paper-raised: #fbfaf5;
+  --line: #d7d0bd;
+  --accent: #2f5d8a;
+
+  --red: #b8433a;
+  --red-tint: #f6e3e1;
+  --orange: #c9822f;
+  --orange-tint: #f6ead9;
+  --green: #47795c;
+  --green-tint: #e2ebe2;
+  --gray: #918c7e;
+  --gray-tint: #eae7dd;
+
+  --radius: 10px;
+  --font-display: 'Fraunces', serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+}
+
+/* ---------- topbar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 28px 40px 20px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(239,236,225,0.97), rgba(239,236,225,0.85));
+  backdrop-filter: blur(4px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topbar__brand { display: flex; align-items: center; gap: 14px; }
+
+.topbar__mark {
+  font-size: 30px;
+  color: var(--accent);
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.topbar__title h1 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 26px;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.topbar__title p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- toggle ---------- */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.toggle input { display: none; }
+
+.toggle__track {
+  width: 38px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line);
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--paper-raised);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform 0.2s ease;
+}
+
+.toggle input:checked + .toggle__track { background: var(--accent); }
+.toggle input:checked + .toggle__track .toggle__thumb { transform: translateX(18px); }
+
+/* ---------- stack ---------- */
+
+.stack {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 36px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  max-width: 420px;
+  margin: 40px auto;
+}
+
+/* ---------- card ---------- */
+
+.card {
+  background: var(--paper-raised);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--gray);
+  box-shadow: 0 1px 2px rgba(22,34,61,0.06), 0 6px 16px rgba(22,34,61,0.05);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 0;
+  position: relative;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(22,34,61,0.08), 0 10px 24px rgba(22,34,61,0.09);
+}
+
+.card--red { border-left-color: var(--red); }
+.card--orange { border-left-color: var(--orange); }
+.card--green { border-left-color: var(--green); }
+.card--gray { border-left-color: var(--gray); }
+
+.card--hidden-status { opacity: 0.55; }
+
+.card__thumb {
+  width: 96px;
+  align-self: stretch;
+  background-color: var(--gray-tint);
+  background-size: cover;
+  background-position: center;
+  border-right: 1px solid var(--line);
+}
+
+.card__body {
+  padding: 16px 18px;
+  min-width: 0;
+}
+
+.card__eyebrow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+
+.card__eyebrow .tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--gray-tint);
+  color: var(--ink-soft);
+}
+
+.card__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+
+.card__title a { color: var(--ink); text-decoration: none; }
+.card__title a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+
+.card__place {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+}
+
+.card__deadline {
+  padding: 16px 18px 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: right;
+  min-width: 148px;
+}
+
+.card__deadline-count {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.card--red .card__deadline-count { color: var(--red); }
+.card--orange .card__deadline-count { color: var(--orange); }
+.card--green .card__deadline-count { color: var(--green); }
+.card--gray .card__deadline-count { color: var(--gray); }
+
+.card__deadline-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  max-width: 130px;
+}
+
+.card__status-pill {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper-raised);
+}
+
+/* ---------- footer ---------- */
+
+.footer {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+  padding: 20px 0 40px;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 560px) {
+  .topbar { padding: 20px 20px 16px; }
+  .card { grid-template-columns: 72px 1fr; }
+  .card__deadline {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    padding: 0 18px 14px;
+    text-align: left;
+  }
+  .card__deadline-count { font-size: 18px; }
+}

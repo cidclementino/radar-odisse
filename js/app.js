@@ -131,7 +131,7 @@ function renderCard(concurso) {
         <h2 class="concurso__title"><span class="concurso__title-text">${escapeHTML(concurso.nome)}</span></h2>
         <p class="concurso__place">${escapeHTML(concurso.local_projeto)}</p>
       </div>
-      <div class="concurso__deadline">
+      <div class="concurso__footer">
         <span class="concurso__deadline-count tabular">${!encerrado && dias !== null ? dias : '—'}</span>
         <span class="concurso__deadline-label">${textoPrazo(dias, encerrado)}</span>
       </div>

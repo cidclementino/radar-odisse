@@ -13,6 +13,13 @@ const STATUS_LABELS = {
   inscrito: 'Inscrito',
 };
 
+const ESCOPO_LABELS = {
+  arquitetura: 'Arquitetura',
+  urbanismo: 'Urbanismo',
+  paisagismo: 'Paisagismo',
+  design_produto_mobiliario: 'Design de Produto',
+};
+
 function diasAte(dataISO) {
   if (!dataISO) return null;
   const hoje = new Date();
@@ -23,8 +30,7 @@ function diasAte(dataISO) {
 
 // Um concurso é considerado "encerrado" automaticamente quando o prazo de
 // inscrição já passou, independente do status_interno ter sido atualizado
-// manualmente ou não. Isso evita mostrar como "aberto" algo cujo prazo já
-// venceu só porque ninguém tocou no card antes disso acontecer.
+// manualmente ou não.
 function estaEncerrado(dias) {
   return dias !== null && dias < 0;
 }
@@ -37,12 +43,11 @@ function corPorPrazo(dias, encerrado) {
   return 'green';
 }
 
+// Label estático — o número já está grande ao lado, não repete a contagem aqui.
 function textoPrazo(dias, encerrado) {
   if (encerrado) return 'Inscrições encerradas';
   if (dias === null || dias === undefined) return 'Prazo de inscrição não informado';
-  if (dias === 0) return 'Inscrições encerram hoje';
-  if (dias === 1) return 'Inscrições encerram amanhã';
-  return `Inscrições encerram em ${dias} dias`;
+  return 'dias para o fim das inscrições';
 }
 
 function escapeHTML(str) {
@@ -51,27 +56,65 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+function campoDetalhe(label, valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  return `
+    <div class="concurso__detail-item">
+      <div class="concurso__detail-label">${escapeHTML(label)}</div>
+      <div class="concurso__detail-value">${escapeHTML(valor)}</div>
+    </div>
+  `;
+}
+
+function renderDetalhe(concurso) {
+  const link = concurso.link_oficial || concurso.fonte_url_original;
+  const linkTexto = concurso.link_oficial ? 'Abrir site oficial ↗' : 'Ver publicação original ↗';
+
+  const custoTexto = concurso.inscricao?.gratuita === true
+    ? 'Gratuita' + (concurso.inscricao?.obs ? ` — ${concurso.inscricao.obs}` : '')
+    : concurso.inscricao?.custo || null;
+
+  const bancaTexto = concurso.banca_definida === true
+    ? (concurso.banca_obs || 'Definida')
+    : concurso.banca_definida === false
+      ? 'Ainda não definida'
+      : null;
+
+  return `
+    <div class="concurso__detail">
+      <div class="concurso__detail-grid">
+        ${campoDetalhe('Promotor', concurso.promotor)}
+        ${campoDetalhe('Destinado a', concurso.destinado_a)}
+        ${campoDetalhe('Inscrição', custoTexto)}
+        ${campoDetalhe('Prêmio', concurso.premio)}
+        ${campoDetalhe('Banca julgadora', bancaTexto)}
+        ${campoDetalhe('Entrega do projeto', concurso.datas?.entrega_fim)}
+      </div>
+      ${link ? `<a class="concurso__detail-link" href="${escapeHTML(link)}" target="_blank" rel="noopener">${linkTexto}</a>` : ''}
+    </div>
+  `;
+}
+
 function renderCard(concurso) {
   const dias = diasAte(concurso.datas?.inscricao_fim);
   const encerrado = estaEncerrado(dias);
   const cor = corPorPrazo(dias, encerrado);
   const hiddenStatus = STATUS_HIDDEN_BY_DEFAULT.has(concurso.status_interno) || encerrado;
 
-  // link_oficial é o site do concurso; quando desconhecido, cai pro link do
-  // agregador (fonte_url_original) — sempre precisa de ALGUM link clicável.
-  const link = concurso.link_oficial || concurso.fonte_url_original;
-
   const el = document.createElement('article');
   el.className = `concurso concurso--${cor}${hiddenStatus ? ' concurso--hidden-status' : ''}`;
   el.dataset.status = concurso.status_interno;
   el.dataset.encerrado = String(encerrado);
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-expanded', 'false');
 
-  const thumbStyle = concurso.imagem_url
+  const bannerStyle = concurso.imagem_url
     ? `style="background-image:url('${concurso.imagem_url}')"`
     : '';
 
   const tags = (concurso.escopo || [])
-    .map(e => `<span class="tag">${escapeHTML(e.replace('_', ' '))}</span>`)
+    .map(e => `<span class="tag">${escapeHTML(ESCOPO_LABELS[e] || e)}</span>`)
     .join('');
 
   const statusPill = encerrado
@@ -81,25 +124,33 @@ function renderCard(concurso) {
       : '';
 
   el.innerHTML = `
-    <div class="concurso__thumb" ${thumbStyle}></div>
-    <div class="concurso__body">
-      <div class="concurso__eyebrow">
-        <span>${escapeHTML(concurso.tipo)}</span>
-        ${tags}
+    <div class="concurso__banner" ${bannerStyle}></div>
+    <div class="concurso__row">
+      <div class="concurso__body">
+        <div class="concurso__eyebrow">${tags}</div>
+        <h2 class="concurso__title"><span class="concurso__title-text">${escapeHTML(concurso.nome)}</span></h2>
+        <p class="concurso__place">${escapeHTML(concurso.local_projeto)}</p>
       </div>
-      <h2 class="concurso__title">
-        <a href="${escapeHTML(link || '#')}" target="_blank" rel="noopener">
-          ${escapeHTML(concurso.nome)}
-        </a>
-      </h2>
-      <p class="concurso__place">${escapeHTML(concurso.local_projeto)}</p>
-    </div>
-    <div class="concurso__deadline">
-      <span class="concurso__deadline-count tabular">${!encerrado && dias !== null ? dias : '—'}</span>
-      <span class="concurso__deadline-label">${textoPrazo(dias, encerrado)}</span>
+      <div class="concurso__deadline">
+        <span class="concurso__deadline-count tabular">${!encerrado && dias !== null ? dias : '—'}</span>
+        <span class="concurso__deadline-label">${textoPrazo(dias, encerrado)}</span>
+      </div>
     </div>
     ${statusPill}
+    ${renderDetalhe(concurso)}
   `;
+
+  const alternar = () => {
+    const expandido = el.classList.toggle('is-expanded');
+    el.setAttribute('aria-expanded', String(expandido));
+  };
+  el.addEventListener('click', alternar);
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); }
+  });
+
+  const linkDetalhe = el.querySelector('.concurso__detail-link');
+  if (linkDetalhe) linkDetalhe.addEventListener('click', e => e.stopPropagation());
 
   return el;
 }
@@ -109,9 +160,16 @@ function render(concursos, mostrarTodos) {
   const emptyState = document.getElementById('empty-state');
   stack.innerHTML = '';
 
-  const ordenados = [...concursos].sort(
-    (a, b) => new Date(b.coletado_em) - new Date(a.coletado_em)
-  );
+  // Ordena por proximidade do prazo de inscrição (mais urgente primeiro).
+  // Concursos sem data informada ficam por último, entre os visíveis.
+  const ordenados = [...concursos].sort((a, b) => {
+    const diasA = diasAte(a.datas?.inscricao_fim);
+    const diasB = diasAte(b.datas?.inscricao_fim);
+    if (diasA === null && diasB === null) return 0;
+    if (diasA === null) return 1;
+    if (diasB === null) return -1;
+    return diasA - diasB;
+  });
 
   const visiveis = mostrarTodos
     ? ordenados

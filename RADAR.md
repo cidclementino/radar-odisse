@@ -35,7 +35,16 @@ quando o job começar a rodar; concursos com prazo já vencido não entram.
 
 `escopo` é uma lista (não um valor único), porque um concurso pode ser mais de
 uma coisa ao mesmo tempo (ex: arquitetura + paisagismo). Valores possíveis:
-`arquitetura`, `urbanismo`, `paisagismo`, `design_produto_mobiliario`.
+`arquitetura`, `urbanismo`, `paisagismo`, `design_produto_mobiliario`. Na
+interface, `design_produto_mobiliario` aparece como "Design de Produto"
+(rótulo simplificado — ver `ESCOPO_LABELS` em `js/app.js`).
+
+## Prêmio
+
+Campo `premio` (texto livre, `null` se desconhecido) — valor/reconhecimento
+oferecido pelo concurso. Raramente vem estruturado nas fontes (RSS, HTML),
+então por ora é sempre `null` nos parsers automáticos — preenchido
+manualmente na revisão quando relevante.
 
 ## Schema do `Concurso`
 
@@ -106,16 +115,27 @@ que fundir errado), mas significa que a fila de revisão pode ter mais itens
 
 ## Interface — pilha de cards
 
-- Ordenação: mais recentemente adicionado primeiro (`coletado_em` desc).
-- Filtro padrão: mostra só `status_interno = "monitorando"`. Toggle no topo
-  revela `descartado` e `inscrito` também.
-- Cor da borda — calculada a partir de `inscricao_fim` (não `entrega_fim`):
+- Ordenação: **por proximidade do prazo de inscrição** (mais urgente primeiro).
+  Concursos sem `inscricao_fim` informado ficam por último. *(Decisão
+  revisada — originalmente era "mais recentemente adicionado primeiro"; troca
+  feita depois de ver a lista renderizada e notar que ordem por data de
+  urgência é mais útil na prática.)*
+- Filtro padrão: mostra só `status_interno = "monitorando"` **e** ainda não
+  encerrado. Toggle no topo revela `descartado`, `inscrito` e encerrados.
+- Cor da borda — calculada a partir de `inscricao_fim`:
   - `≤ 15 dias` → vermelho
   - `16–45 dias` → laranja
   - `> 45 dias` → verde
-  - desconhecido → cinza
-- O texto "inscrições encerram em X dias" usa o mesmo prazo (`inscricao_fim`)
-  que define a cor — ambos sempre consistentes entre si.
+  - desconhecido ou encerrado → cinza
+- Card compacto mostra: banner (paisagem, imagem de capa), tags de escopo,
+  nome, local, número grande de dias + label estática "dias para o fim das
+  inscrições" (o número não se repete no texto). **Não mostra** o rótulo
+  nacional/internacional (removido — já é redundante com o local).
+- Clicar no card (ou Enter/Espaço com foco no card) expande um painel de
+  detalhe com: promotor, destinado a, condição de inscrição, prêmio, banca
+  julgadora, data de entrega do projeto, e um link explícito pro site oficial
+  (ou pra publicação de origem, quando `link_oficial` é desconhecido — o
+  texto do link muda pra deixar isso claro).
 
 ## Nomenclatura
 

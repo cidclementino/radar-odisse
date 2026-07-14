@@ -108,6 +108,7 @@ function fundir(existente, candidato) {
     local_projeto: preencher(existente.local_projeto, candidato.local_projeto),
     destinado_a: preencher(existente.destinado_a, candidato.destinado_a),
     imagem_url: preencher(existente.imagem_url, candidato.imagem_url),
+    premio: preencher(existente.premio, candidato.premio),
     banca_definida: existente.banca_definida === null ? candidato.banca_definida : existente.banca_definida,
     banca_obs: preencher(existente.banca_obs, candidato.banca_obs),
     inscricao: {

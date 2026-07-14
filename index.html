@@ -3,39 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radar Odisse — Concursos de Arquitetura</title>
+<title>Radar Odisse — Concursos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
   <header class="topbar">
-    <div class="topbar__brand">
-      <span class="topbar__mark">◎</span>
-      <div class="topbar__title">
-        <h1>Radar Odisse</h1>
-        <p>Concursos e editais em monitoramento</p>
-      </div>
-    </div>
-
-    <div class="topbar__controls">
-      <label class="toggle">
-        <input type="checkbox" id="toggle-all">
-        <span class="toggle__track"><span class="toggle__thumb"></span></span>
-        <span class="toggle__label">Mostrar todos (inclui descartados e inscritos)</span>
+    <div class="topbar__mark">ODISSE · RADAR</div>
+    <div class="topbar__meta">
+      <label class="switch-row">
+        <span class="switch-row__hint">Mostrar todos</span>
+        <span class="switch">
+          <input type="checkbox" id="toggle-all">
+          <span class="switch__track"></span>
+          <span class="switch__thumb"></span>
+        </span>
       </label>
     </div>
   </header>
 
-  <main class="stack" id="stack" aria-live="polite">
-    <!-- cards injected here -->
+  <main class="stage">
+    <div class="stage__col">
+      <p class="step__eyebrow">Radar</p>
+      <h1 class="step__title">Concursos em monitoramento</h1>
+      <p class="step__desc">Atualizado semanalmente via GitHub Actions. Concursos com prazo de inscrição já vencido saem da lista automaticamente.</p>
+
+      <div class="stack" id="stack" aria-live="polite"></div>
+      <p class="empty-state" id="empty-state" hidden>
+        Nenhum concurso em monitoramento no momento. Ative "Mostrar todos" acima para ver o histórico completo.
+      </p>
+    </div>
   </main>
 
-  <p class="empty-state" id="empty-state" hidden>
-    Nenhum concurso em monitoramento no momento. Ajuste o filtro acima para ver o histórico completo.
-  </p>
-
   <footer class="footer">
-    <span id="footer-count"></span> · atualizado semanalmente via GitHub Actions
+    <span id="footer-count"></span>
   </footer>
 
   <script src="js/app.js"></script>

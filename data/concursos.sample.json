@@ -5,10 +5,16 @@
     "promotor": "Pohang Municipal Government",
     "local_projeto": "Pohang, Coreia do Sul",
     "destinado_a": "Arquitetos e urbanistas, sem restrição de nacionalidade",
-    "escopo": ["arquitetura"],
+    "escopo": [
+      "arquitetura"
+    ],
     "tipo": "internacional",
     "imagem_url": "https://concursosdeprojeto.org/wp-content/uploads/2026/06/image.png",
-    "inscricao": { "gratuita": false, "custo": "USD 150", "obs": null },
+    "inscricao": {
+      "gratuita": false,
+      "custo": "USD 150",
+      "obs": null
+    },
     "banca_definida": null,
     "banca_obs": null,
     "datas": {
@@ -17,10 +23,13 @@
       "resultado_previsto": null,
       "texto_bruto": "Submission: 30th September 2026 | Registration: 20th July 2026"
     },
-    "link_oficial": "https://competitions.archi/competition/open-call-international-design-competition-for-pohang-museum/",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["concursosdeprojeto.org", "competitions.archi"],
+    "fontes": [
+      "concursosdeprojeto.org",
+      "competitions.archi"
+    ],
     "fonte_url_original": "https://concursosdeprojeto.org/2026/06/24/concurso-internacional-pohang-museum-coreia-do-sul/",
     "coletado_em": "2026-07-06T08:00:00Z",
     "atualizado_em": "2026-07-13T08:00:00Z"
@@ -31,25 +40,35 @@
     "promotor": "IAB/PR, Câmara Municipal de Curitiba, IPPUC",
     "local_projeto": "Curitiba, Brasil",
     "destinado_a": "Arquitetos e urbanistas registrados no CAU",
-    "escopo": ["arquitetura", "urbanismo"],
+    "escopo": [
+      "arquitetura",
+      "urbanismo"
+    ],
     "tipo": "nacional",
     "imagem_url": "https://concursosdeprojeto.org/wp-content/uploads/2026/02/image.png",
-    "inscricao": { "gratuita": true, "custo": null, "obs": "Isento de taxa" },
+    "inscricao": {
+      "gratuita": true,
+      "custo": null,
+      "obs": "Isento de taxa"
+    },
     "banca_definida": true,
     "banca_obs": "Comissão julgadora divulgada no edital",
     "datas": {
-      "inscricao_fim": "2026-07-18",
-      "entrega_fim": "2026-08-10",
-      "resultado_previsto": "2026-09-01",
-      "texto_bruto": "Inscrições até 18/07/2026, entrega de propostas até 10/08/2026"
+      "inscricao_fim": "2026-03-19",
+      "entrega_fim": "2026-04-10",
+      "resultado_previsto": null,
+      "texto_bruto": "Inscrições até 19/03/2026, entrega de propostas até 10/04/2026 — resultado divulgado em 23/06/2026"
     },
-    "link_oficial": "https://iab.org.br/concurso-nacional-de-arquitetura-nova-camara-municipal-de-curitiba/",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["iab.org.br", "concursosdeprojeto.org"],
+    "fontes": [
+      "iab.org.br",
+      "concursosdeprojeto.org"
+    ],
     "fonte_url_original": "https://iab.org.br/concurso-nacional-de-arquitetura-nova-camara-municipal-de-curitiba/",
-    "coletado_em": "2026-06-29T08:00:00Z",
-    "atualizado_em": "2026-07-06T08:00:00Z"
+    "coletado_em": "2026-02-12T08:00:00Z",
+    "atualizado_em": "2026-02-12T08:00:00Z"
   },
   {
     "id": "cd-2026-0014",
@@ -57,10 +76,17 @@
     "promotor": "Concéntrico Logroño",
     "local_projeto": "Barcelona, Espanha",
     "destinado_a": "Arquitetos, designers e coletivos multidisciplinares",
-    "escopo": ["arquitetura", "design_produto_mobiliario"],
+    "escopo": [
+      "arquitetura",
+      "design_produto_mobiliario"
+    ],
     "tipo": "internacional",
     "imagem_url": "https://images.adsttc.com/media/barcelona-concentrico-cover.jpg",
-    "inscricao": { "gratuita": true, "custo": null, "obs": null },
+    "inscricao": {
+      "gratuita": true,
+      "custo": null,
+      "obs": null
+    },
     "banca_definida": null,
     "banca_obs": null,
     "datas": {
@@ -69,10 +95,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Registration closes August 25th"
     },
-    "link_oficial": "https://www.archdaily.com/en/1047909/open-call-barcelona-concentrico-x-cruilla",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["archdaily.com"],
+    "fontes": [
+      "archdaily.com"
+    ],
     "fonte_url_original": "https://www.archdaily.com/en/1047909/open-call-barcelona-concentrico-x-cruilla",
     "coletado_em": "2026-07-13T08:00:00Z",
     "atualizado_em": "2026-07-13T08:00:00Z"
@@ -83,10 +111,16 @@
     "promotor": "Espaço de Arquitetura",
     "local_projeto": "Portugal (nacional)",
     "destinado_a": "Arquitetos e escritórios de arquitetura portugueses",
-    "escopo": ["arquitetura"],
+    "escopo": [
+      "arquitetura"
+    ],
     "tipo": "internacional",
     "imagem_url": "https://espacodearquitetura.com/wp-content/uploads/premio-fernando-tavora.jpg",
-    "inscricao": { "gratuita": true, "custo": null, "obs": null },
+    "inscricao": {
+      "gratuita": true,
+      "custo": null,
+      "obs": null
+    },
     "banca_definida": null,
     "banca_obs": null,
     "datas": {
@@ -95,10 +129,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Entrega das candidaturas até 10 de Agosto de 2026"
     },
-    "link_oficial": "https://espacodearquitetura.com/concursos/premio-fernando-tavora-22a-edicao/",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["espacodearquitetura.com"],
+    "fontes": [
+      "espacodearquitetura.com"
+    ],
     "fonte_url_original": "https://espacodearquitetura.com/concursos/premio-fernando-tavora-22a-edicao/",
     "coletado_em": "2026-06-22T08:00:00Z",
     "atualizado_em": "2026-06-22T08:00:00Z"
@@ -109,10 +145,16 @@
     "promotor": "Concept / Open",
     "local_projeto": "Local não especificado",
     "destinado_a": "Arquitetos e estudantes",
-    "escopo": ["arquitetura"],
+    "escopo": [
+      "arquitetura"
+    ],
     "tipo": "internacional",
     "imagem_url": "https://competitions.archi/wp-content/uploads/2026/07/Market-Hall-of-Local-Produce-1.jpg",
-    "inscricao": { "gratuita": false, "custo": "Ver site", "obs": null },
+    "inscricao": {
+      "gratuita": false,
+      "custo": "Ver site",
+      "obs": null
+    },
     "banca_definida": null,
     "banca_obs": null,
     "datas": {
@@ -121,10 +163,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Submission: 24th July 2026 | Registration: 14th July 2026"
     },
-    "link_oficial": "https://competitions.archi/competition/market-hall-of-local-produce/",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["competitions.archi"],
+    "fontes": [
+      "competitions.archi"
+    ],
     "fonte_url_original": "https://competitions.archi/competition/market-hall-of-local-produce/",
     "coletado_em": "2026-07-13T08:00:00Z",
     "atualizado_em": "2026-07-13T08:00:00Z"
@@ -135,10 +179,16 @@
     "promotor": "ADC Community",
     "local_projeto": "Online (sem restrição geográfica)",
     "destinado_a": "Designers de produto, arquitetos e criativos",
-    "escopo": ["design_produto_mobiliario"],
+    "escopo": [
+      "design_produto_mobiliario"
+    ],
     "tipo": "internacional",
     "imagem_url": "https://espacodearquitetura.com/wp-content/uploads/design-skill-awards.jpg",
-    "inscricao": { "gratuita": false, "custo": "USD 89", "obs": "Desconto para inscrição antecipada" },
+    "inscricao": {
+      "gratuita": false,
+      "custo": "USD 89",
+      "obs": "Desconto para inscrição antecipada"
+    },
     "banca_definida": false,
     "banca_obs": null,
     "datas": {
@@ -147,10 +197,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Submissions open until October 9th"
     },
-    "link_oficial": "https://espacodearquitetura.com/concursos/design-skill-awards-2026/",
+    "link_oficial": null,
     "status_interno": "descartado",
     "motivo_descarte": "Foco em produto seriado, fora do interesse atual do estúdio",
-    "fontes": ["espacodearquitetura.com"],
+    "fontes": [
+      "espacodearquitetura.com"
+    ],
     "fonte_url_original": "https://espacodearquitetura.com/concursos/design-skill-awards-2026/",
     "coletado_em": "2026-04-17T08:00:00Z",
     "atualizado_em": "2026-05-02T08:00:00Z"
@@ -161,10 +213,17 @@
     "promotor": "Prefeitura de Campina Grande, IAB, CAU/PB",
     "local_projeto": "Campina Grande, Paraíba, Brasil",
     "destinado_a": "Arquitetos e urbanistas de todo o Brasil",
-    "escopo": ["arquitetura", "urbanismo"],
+    "escopo": [
+      "arquitetura",
+      "urbanismo"
+    ],
     "tipo": "nacional",
     "imagem_url": "https://iab.org.br/wp-content/uploads/feira-campina-grande.jpg",
-    "inscricao": { "gratuita": true, "custo": null, "obs": null },
+    "inscricao": {
+      "gratuita": true,
+      "custo": null,
+      "obs": null
+    },
     "banca_definida": true,
     "banca_obs": "Comissão técnica formada por IAB, CAU/PB e Prefeitura",
     "datas": {
@@ -173,10 +232,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Inscrições até 15/07, entrega até 05/08"
     },
-    "link_oficial": "https://iab.org.br/lancado-concurso-para-requalificacao-da-feira-central-de-campina-grande/",
+    "link_oficial": null,
     "status_interno": "inscrito",
     "motivo_descarte": null,
-    "fontes": ["iab.org.br"],
+    "fontes": [
+      "iab.org.br"
+    ],
     "fonte_url_original": "https://iab.org.br/lancado-concurso-para-requalificacao-da-feira-central-de-campina-grande/",
     "coletado_em": "2026-06-01T08:00:00Z",
     "atualizado_em": "2026-07-10T08:00:00Z"
@@ -187,10 +248,16 @@
     "promotor": "Ministério da Educação (concept)",
     "local_projeto": "Brasil (nacional)",
     "destinado_a": "Estudantes e profissionais de arquitetura",
-    "escopo": ["arquitetura"],
+    "escopo": [
+      "arquitetura"
+    ],
     "tipo": "nacional",
     "imagem_url": "https://concursosdeprojeto.org/wp-content/uploads/2026/02/image-1.png",
-    "inscricao": { "gratuita": true, "custo": null, "obs": null },
+    "inscricao": {
+      "gratuita": true,
+      "custo": null,
+      "obs": null
+    },
     "banca_definida": null,
     "banca_obs": null,
     "datas": {
@@ -199,10 +266,12 @@
       "resultado_previsto": null,
       "texto_bruto": "Datas a confirmar no edital completo"
     },
-    "link_oficial": "https://concursosdeprojeto.org/2026/02/26/concurso-de-ideias-espacos-de-aprendizagem/",
+    "link_oficial": null,
     "status_interno": "monitorando",
     "motivo_descarte": null,
-    "fontes": ["concursosdeprojeto.org"],
+    "fontes": [
+      "concursosdeprojeto.org"
+    ],
     "fonte_url_original": "https://concursosdeprojeto.org/2026/02/26/concurso-de-ideias-espacos-de-aprendizagem/",
     "coletado_em": "2026-02-26T08:00:00Z",
     "atualizado_em": "2026-02-26T08:00:00Z"

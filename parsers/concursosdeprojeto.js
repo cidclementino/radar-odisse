@@ -83,6 +83,7 @@ async function parse() {
       escopo: classificarEscopo(item.title, categorias),
       tipo: classificarTipo(categorias),
       imagem_url: extrairImagem(item),
+      premio: null, // raramente estruturado no RSS — fica pra revisão manual
 
       inscricao: { gratuita: null, custo: null, obs: null },
 

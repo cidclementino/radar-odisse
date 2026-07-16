@@ -8,21 +8,34 @@
 //   - Variável de ambiente `COLLECT_SECRET` -> string compartilhada com o GitHub Actions
 //
 // Rotas:
-//   GET  /api/concursos        -> lista todos os Concursos (usado pelo front-end estático)
-//   GET  /api/revisao          -> lista pendências de revisão manual (fase 2 da UI)
-//   POST /api/collect          -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
-//   GET  /api/oportunidades    -> lista todas as Oportunidades (Terrenos)
-//   GET  /api/corretores       -> lista todos os Corretores (Terrenos)
-//   POST /api/collect-terrenos -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
+//   GET    /api/concursos          -> lista todos os Concursos (usado pelo front-end estático)
+//   GET    /api/revisao            -> lista pendências de revisão manual (fase 2 da UI)
+//   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
+//   PATCH  /api/concursos/:id      -> atualiza status_interno de um Concurso (ex: descartar/restaurar)
+//   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
+//   GET    /api/oportunidades      -> lista todas as Oportunidades (Terrenos)
+//   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
+//   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
+//
+// NOTA DE SEGURANÇA: as rotas PATCH/DELETE de Concursos não exigem
+// autenticação, assim como o resto do painel (não há login hoje — ver
+// README, seção "Próxima rodada"). Qualquer pessoa com a URL do painel
+// pode descartar ou apagar itens. Isso é uma decisão consciente pra manter
+// o painel simples enquanto for uso interno de poucas pessoas; se isso
+// mudar, vale revisitar (ex: Cloudflare Access na frente do Worker, ou um
+// segredo próprio de UI — nunca reaproveitar o COLLECT_SECRET aqui, pois
+// ele ficaria exposto no JS público do front-end).
 
 import { classificarConcursos } from './dedup.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+const STATUS_VALIDOS = new Set(['monitorando', 'descartado', 'inscrito']);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -82,6 +95,53 @@ async function handleCollect(request, env) {
   });
 }
 
+/**
+ * PATCH /api/concursos/:id — atualiza o status_interno de um Concurso.
+ * Usado pelos botões "Descartar" e "Restaurar" no card. Não apaga nada do
+ * KV — só muda o campo, que já é respeitado pelo front-end pra
+ * esconder/mostrar o item (ver STATUS_HIDDEN_BY_DEFAULT em js/app.js).
+ */
+async function handlePatchConcurso(request, env, id) {
+  const existente = await env.CONCURSOS.get(id, 'json');
+  if (!existente) {
+    return json({ error: 'concurso não encontrado' }, 404);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'corpo inválido — esperado JSON' }, 400);
+  }
+
+  const { status_interno } = body || {};
+  if (!STATUS_VALIDOS.has(status_interno)) {
+    return json({ error: `status_interno inválido — use um de: ${[...STATUS_VALIDOS].join(', ')}` }, 400);
+  }
+
+  const atualizado = {
+    ...existente,
+    status_interno,
+    atualizado_em: new Date().toISOString(),
+  };
+  await env.CONCURSOS.put(id, JSON.stringify(atualizado));
+
+  return json(atualizado);
+}
+
+/**
+ * DELETE /api/concursos/:id — apaga o Concurso definitivamente do KV.
+ * Irreversível — o front-end pede confirmação antes de chamar essa rota.
+ */
+async function handleDeleteConcurso(env, id) {
+  const existente = await env.CONCURSOS.get(id, 'json');
+  if (!existente) {
+    return json({ error: 'concurso não encontrado' }, 404);
+  }
+  await env.CONCURSOS.delete(id);
+  return json({ deletado: true, id });
+}
+
 async function handleCollectTerrenos(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth !== `Bearer ${env.COLLECT_SECRET}`) {
@@ -132,6 +192,19 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/collect') {
       return handleCollect(request, env);
+    }
+
+    // Rotas /api/concursos/:id — checadas antes do GET genérico de cima
+    // porque o pathname aqui tem um segmento a mais.
+    const matchConcursoId = url.pathname.match(/^\/api\/concursos\/([^/]+)$/);
+    if (matchConcursoId) {
+      const id = decodeURIComponent(matchConcursoId[1]);
+      if (request.method === 'PATCH') {
+        return handlePatchConcurso(request, env, id);
+      }
+      if (request.method === 'DELETE') {
+        return handleDeleteConcurso(env, id);
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/oportunidades') {

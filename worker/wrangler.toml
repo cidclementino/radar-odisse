@@ -7,6 +7,8 @@ compatibility_date = "2026-07-01"
 kv_namespaces = [
   { binding = "CONCURSOS", id = "SUBSTITUIR_PELO_ID_REAL" },
   { binding = "REVISAO", id = "SUBSTITUIR_PELO_ID_REAL" },
+  { binding = "OPORTUNIDADES", id = "SUBSTITUIR_PELO_ID_REAL" },
+  { binding = "CORRETORES", id = "SUBSTITUIR_PELO_ID_REAL" },
 ]
 
 # Defina com: wrangler secret put COLLECT_SECRET

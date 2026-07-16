@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radar Odisse — Concursos</title>
+<title>Radar Odisse — Terrenos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
@@ -14,8 +14,8 @@
   <header class="topbar">
     <div class="topbar__mark">ODISSE · RADAR</div>
     <nav class="topbar__nav">
-      <a class="topbar__nav-link topbar__nav-link--active" href="index.html">Concursos</a>
-      <a class="topbar__nav-link" href="terrenos.html">Terrenos</a>
+      <a class="topbar__nav-link" href="index.html">Concursos</a>
+      <a class="topbar__nav-link topbar__nav-link--active" href="terrenos.html">Terrenos</a>
     </nav>
     <div class="topbar__meta">
       <label class="switch-row">
@@ -33,14 +33,22 @@
     <div class="stage__col">
       <div class="stage__intro">
         <p class="step__eyebrow">Radar</p>
-        <h1 class="step__title">Concursos em monitoramento</h1>
-        <p class="step__desc">Atualizado semanalmente via GitHub Actions. Concursos com prazo de inscrição já vencido saem da lista automaticamente.</p>
+        <h1 class="step__title">Oportunidades de terreno</h1>
+        <p class="step__desc">Sinais de terrenista e de corretor, coletados via OLX, ZAP Imóveis e YouTube. Classificados por nível de maturidade — o sistema registra o sinal, a leitura de abordagem é manual.</p>
       </div>
 
-      <div class="stack" id="stack" aria-live="polite"></div>
+      <div class="stack" id="stack-oportunidades" aria-live="polite"></div>
       <p class="empty-state" id="empty-state" hidden>
-        Nenhum concurso em monitoramento no momento. Ative "Mostrar todos" acima para ver o histórico completo.
+        Nenhuma oportunidade em monitoramento no momento. Ative "Mostrar todos" acima para ver o histórico completo.
       </p>
+
+      <div class="section-divider">
+        <p class="step__eyebrow">Corretores</p>
+        <h2 class="step__title step__title--small">Perfis acumulados</h2>
+        <p class="step__desc">Corretores descobertos via YouTube e/ou ZAP Imóveis. Fusão por nome → CRECI → empresa.</p>
+      </div>
+
+      <div class="corretor-list" id="corretor-list" aria-live="polite"></div>
     </div>
   </main>
 
@@ -48,6 +56,6 @@
     <span id="footer-count"></span>
   </footer>
 
-  <script src="js/app.js"></script>
+  <script src="js/terrenos.js"></script>
 </body>
 </html>

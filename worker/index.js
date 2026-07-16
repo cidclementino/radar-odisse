@@ -3,14 +3,20 @@
 // Bindings esperados (configurar em wrangler.toml / painel Cloudflare):
 //   - KV Namespace `CONCURSOS`       -> id -> Concurso (JSON)
 //   - KV Namespace `REVISAO`         -> id -> { candidato_existente, candidato_novo, motivo, criado_em }
+//   - KV Namespace `OPORTUNIDADES`   -> id -> Oportunidade (JSON) — aba Terrenos
+//   - KV Namespace `CORRETORES`      -> id -> Corretor (JSON) — aba Terrenos
 //   - Variável de ambiente `COLLECT_SECRET` -> string compartilhada com o GitHub Actions
 //
 // Rotas:
 //   GET  /api/concursos        -> lista todos os Concursos (usado pelo front-end estático)
 //   GET  /api/revisao          -> lista pendências de revisão manual (fase 2 da UI)
-//   POST /api/collect          -> recebe candidatos brutos de um parser (Authorization: Bearer <secret>)
+//   POST /api/collect          -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
+//   GET  /api/oportunidades    -> lista todas as Oportunidades (Terrenos)
+//   GET  /api/corretores       -> lista todos os Corretores (Terrenos)
+//   POST /api/collect-terrenos -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
 
 import { classificarConcursos } from './dedup.js';
+import { processarCandidatosCorretor } from './dedup-terrenos.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -76,6 +82,38 @@ async function handleCollect(request, env) {
   });
 }
 
+async function handleCollectTerrenos(request, env) {
+  const auth = request.headers.get('Authorization') || '';
+  if (auth !== `Bearer ${env.COLLECT_SECRET}`) {
+    return json({ error: 'não autorizado' }, 401);
+  }
+
+  const payload = await request.json();
+  const { oportunidades = [], corretoresCandidatos = [] } = payload || {};
+
+  // 1. Processa candidatos a Corretor primeiro — oportunidades de persona
+  // "corretor" (ex: YouTube) e o enriquecimento do ZAP dependem dos ids
+  // resultantes pra preencher corretor_vinculado_id.
+  const corretoresExistentes = await listAll(env.CORRETORES);
+  const corretoresAtualizados = processarCandidatosCorretor(corretoresExistentes, corretoresCandidatos);
+
+  for (const corretor of corretoresAtualizados.values()) {
+    await env.CORRETORES.put(corretor.id, JSON.stringify(corretor));
+  }
+
+  // 2. Grava as Oportunidades (sem dedup entre fontes por ora — cada fonte
+  // gera seu próprio id; ver TERRENOS.md, não havia decisão de dedup entre
+  // fontes de terrenista igual à de Concurso).
+  for (const op of oportunidades) {
+    await env.OPORTUNIDADES.put(op.id, JSON.stringify(op));
+  }
+
+  return json({
+    oportunidades_gravadas: oportunidades.length,
+    corretores_atualizados: corretoresAtualizados.size,
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -94,6 +132,18 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/collect') {
       return handleCollect(request, env);
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/oportunidades') {
+      return json(await listAll(env.OPORTUNIDADES));
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/corretores') {
+      return json(await listAll(env.CORRETORES));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/collect-terrenos') {
+      return handleCollectTerrenos(request, env);
     }
 
     return json({ error: 'não encontrado' }, 404);

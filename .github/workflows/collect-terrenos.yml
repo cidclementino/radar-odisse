@@ -1,0 +1,27 @@
+name: Coleta diária do Radar Odisse — Terrenos
+
+on:
+  schedule:
+    # Segunda a sexta, 09:00 UTC (06:00 em João Pessoa)
+    - cron: '0 9 * * 1-5'
+  workflow_dispatch: {}
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar parsers de Terrenos e enviar pro Worker
+        env:
+          WORKER_URL: ${{ secrets.RADAR_WORKER_URL }}
+          COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: node scripts/collect-terrenos-and-send.js

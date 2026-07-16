@@ -118,4 +118,46 @@ function extractDates(texto) {
   return { inscricao_fim, entrega_fim };
 }
 
-module.exports = { normalizeText, similarity, hashString, generateId, extractDates };
+/**
+ * Parseia timestamps relativos em português como usados pela OLX/ZAP:
+ *   "Hoje, 10:46" | "Ontem, 21:13" | "14 de jul, 23:25"
+ * Retorna data ISO (YYYY-MM-DD) — a hora é descartada propositalmente,
+ * já que o schema de Oportunidade só guarda `publicado_em` como data.
+ */
+function parseTimestampRelativoPT(texto, agora = new Date()) {
+  if (!texto) return null;
+  const t = texto.trim().toLowerCase();
+
+  const hoje = new Date(agora);
+  hoje.setHours(0, 0, 0, 0);
+
+  if (t.startsWith('hoje')) {
+    return hoje.toISOString().slice(0, 10);
+  }
+  if (t.startsWith('ontem')) {
+    const ontem = new Date(hoje);
+    ontem.setDate(ontem.getDate() - 1);
+    return ontem.toISOString().slice(0, 10);
+  }
+
+  // "14 de jul, 23:25" — mês abreviado de 3 letras
+  const MESES_ABREV_PT = {
+    jan: '01', fev: '02', mar: '03', abr: '04', mai: '05', jun: '06',
+    jul: '07', ago: '08', set: '09', out: '10', nov: '11', dez: '12',
+  };
+  const m = t.match(/(\d{1,2})\s+de\s+([a-z]{3})/i);
+  if (m) {
+    const mes = MESES_ABREV_PT[m[2].toLowerCase()];
+    if (mes) {
+      let ano = hoje.getFullYear();
+      // Se o mês/dia parecer estar no futuro em relação a hoje, é do ano anterior.
+      const candidato = new Date(`${ano}-${mes}-${m[1].padStart(2, '0')}T00:00:00`);
+      if (candidato > hoje) ano -= 1;
+      return `${ano}-${mes}-${m[1].padStart(2, '0')}`;
+    }
+  }
+
+  return null;
+}
+
+module.exports = { normalizeText, similarity, hashString, generateId, extractDates, parseTimestampRelativoPT };

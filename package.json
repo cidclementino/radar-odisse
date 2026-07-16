@@ -6,12 +6,17 @@
   "main": "index.js",
   "scripts": {
     "collect": "node scripts/collect-and-send.js",
-    "parse:concursosdeprojeto": "node parsers/concursosdeprojeto.js"
+    "collect:terrenos": "node scripts/collect-terrenos-and-send.js",
+    "parse:concursosdeprojeto": "node parsers/concursosdeprojeto.js",
+    "parse:olx": "node parsers/olx.js",
+    "parse:zap": "node parsers/zap.js",
+    "parse:youtube": "node parsers/youtube.js"
   },
   "keywords": [],
   "author": "Odisse Estúdio de Arquitetura e Design",
   "license": "UNLICENSED",
   "dependencies": {
+    "cheerio": "^1.2.0",
     "rss-parser": "^3.13.0"
   }
 }

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "olx-2026-a1b2c3",
+    "persona": "terrenista",
+    "fonte": "olx.com.br",
+    "titulo": "PERMUTO terreno 500m² no Bessa por apartamento",
+    "local": "Bessa, João Pessoa",
+    "nivel_maturidade": 3,
+    "corretor_vinculado_id": null,
+    "link_original": "https://www.olx.com.br/anuncio/example-1",
+    "texto_bruto": "Permuto terreno de 500m² no bairro do Bessa, aceito apartamento de valor equivalente. Documentação em dia.",
+    "publicado_em": "2026-07-14",
+    "coletado_em": "2026-07-15T08:00:00Z",
+    "status_interno": "monitorando"
+  },
+  {
+    "id": "zap-2026-d4e5f6",
+    "persona": "terrenista",
+    "fonte": "zapimoveis.com.br",
+    "titulo": "Terreno para incorporadora em Manaíra, aceita parceria",
+    "local": "Manaíra, João Pessoa",
+    "nivel_maturidade": 2,
+    "corretor_vinculado_id": "corretor-a1b2",
+    "link_original": "https://www.zapimoveis.com.br/imovel/example-2",
+    "texto_bruto": "Terreno de 390m² em Manaíra, ótima localização, proprietário estuda parceria para incorporação.",
+    "publicado_em": "2026-07-12",
+    "coletado_em": "2026-07-13T08:00:00Z",
+    "status_interno": "monitorando"
+  },
+  {
+    "id": "yt-2026-g7h8i9",
+    "persona": "corretor",
+    "fonte": "youtube.com",
+    "titulo": "Vídeo: \"Terrenos com permuta em Campina Grande - fala com o corretor\"",
+    "local": "Campina Grande",
+    "nivel_maturidade": 1,
+    "corretor_vinculado_id": "corretor-c3d4",
+    "link_original": "https://www.youtube.com/watch?v=example3",
+    "texto_bruto": "Canal menciona ter carteira de terrenos disponíveis para permuta com construtoras da região.",
+    "publicado_em": "2026-07-10",
+    "coletado_em": "2026-07-13T08:00:00Z",
+    "status_interno": "monitorando"
+  },
+  {
+    "id": "olx-2026-j1k2l3",
+    "persona": "terrenista",
+    "fonte": "olx.com.br",
+    "titulo": "Vendo terreno 300m² Cabedelo, aceito troca por imóvel",
+    "local": "Cabedelo",
+    "nivel_maturidade": 2,
+    "corretor_vinculado_id": null,
+    "link_original": "https://www.olx.com.br/anuncio/example-4",
+    "texto_bruto": "Terreno plano, murado, 300m², aceito troca por imóvel de valor próximo. Tratar direto com proprietário.",
+    "publicado_em": "2026-07-11",
+    "coletado_em": "2026-07-12T08:00:00Z",
+    "status_interno": "descartado"
+  },
+  {
+    "id": "zap-2026-m4n5o6",
+    "persona": "terrenista",
+    "fonte": "zapimoveis.com.br",
+    "titulo": "Sociedade para construir - terreno em Recife com estudo aprovado",
+    "local": "Recife",
+    "nivel_maturidade": 1,
+    "corretor_vinculado_id": "corretor-e5f6",
+    "link_original": "https://www.zapimoveis.com.br/imovel/example-5",
+    "texto_bruto": "Proprietário aberto a sociedade para construção, já possui estudo de viabilidade preliminar aprovado na prefeitura.",
+    "publicado_em": "2026-06-30",
+    "coletado_em": "2026-07-01T08:00:00Z",
+    "status_interno": "monitorando"
+  }
+]

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "corretor-a1b2",
+    "nome": "Ricardo Vieira",
+    "empresa": "Escorel Corretora de Imóveis",
+    "creci": null,
+    "regioes_atuacao": ["João Pessoa"],
+    "volume_zap": 4,
+    "descoberto_via": ["zapimoveis.com.br"],
+    "nivel_maturidade": 2,
+    "oportunidades_vinculadas": ["zap-2026-d4e5f6"],
+    "atualizado_em": "2026-07-13T08:00:00Z"
+  },
+  {
+    "id": "corretor-c3d4",
+    "nome": "Jampalife Negócios Imobiliários",
+    "empresa": "Jampalife Negócios Imobiliários",
+    "creci": null,
+    "regioes_atuacao": ["Campina Grande"],
+    "volume_zap": 0,
+    "descoberto_via": ["youtube.com"],
+    "nivel_maturidade": 1,
+    "oportunidades_vinculadas": ["yt-2026-g7h8i9"],
+    "atualizado_em": "2026-07-13T08:00:00Z"
+  },
+  {
+    "id": "corretor-e5f6",
+    "nome": "Adauto H. L. Anjos",
+    "empresa": null,
+    "creci": "PB-12345",
+    "regioes_atuacao": ["Recife", "João Pessoa"],
+    "volume_zap": 2,
+    "descoberto_via": ["zapimoveis.com.br", "youtube.com"],
+    "nivel_maturidade": 2,
+    "oportunidades_vinculadas": ["zap-2026-m4n5o6"],
+    "atualizado_em": "2026-07-01T08:00:00Z"
+  }
+]

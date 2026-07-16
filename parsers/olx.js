@@ -37,6 +37,16 @@ const REGEX_LINK_ANUNCIO = /\/terrenos\/.+-\d{6,}$/;
 const REGEX_PRIVADO = /direto com o propriet[aá]rio/i;
 const REGEX_TIMESTAMP = /(hoje|ontem),\s*\d{1,2}:\d{2}|\d{1,2}\s+de\s+[a-z]{3},\s*\d{1,2}:\d{2}/i;
 
+// Janela de frescor — descarta anúncios com publicado_em mais antigo que isso.
+// 30 dias pro levantamento inicial; reduzir pra 7 depois de validar volume.
+const JANELA_DIAS = 30;
+
+function dentroDaJanela(publicadoEm) {
+  if (!publicadoEm) return true; // sem data extraída -> não descarta por frescor, só por falta de dado
+  const dias = Math.round((Date.now() - new Date(publicadoEm + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24));
+  return dias <= JANELA_DIAS;
+}
+
 /** Sobe pelos ancestrais até achar um bloco de texto que pareça o card do anúncio inteiro. */
 function acharBlocoAnuncio($, $anchor) {
   let $el = $anchor;
@@ -89,6 +99,9 @@ async function buscarUmaUrl(url) {
 
     const timestampTexto = extrairTimestamp(textoBloco);
     const local = extrairLocal(textoBloco);
+    const publicadoEm = parseTimestampRelativoPT(timestampTexto || '');
+
+    if (!dentroDaJanela(publicadoEm)) return; // fora da janela de frescor (30 dias)
 
     oportunidades.push({
       id: generateId(FONTE, href, titulo),
@@ -100,7 +113,7 @@ async function buscarUmaUrl(url) {
       corretor_vinculado_id: null,
       link_original: href.startsWith('http') ? href : `https://www.olx.com.br${href}`,
       texto_bruto: titulo.trim(),
-      publicado_em: parseTimestampRelativoPT(timestampTexto || ''),
+      publicado_em: publicadoEm,
       coletado_em: new Date().toISOString(),
       status_interno: 'monitorando',
     });

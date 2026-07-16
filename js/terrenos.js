@@ -1,11 +1,9 @@
 // Radar Odisse — Terrenos: oportunidades (terrenista/corretor) + perfis de corretor
 //
-// Fontes de dados: por enquanto lê os JSONs de exemplo em data/. Na versão
-// conectada ao Worker, troque as URLs pelos endpoints reais:
-// /api/oportunidades e /api/corretores.
+// Fonte de dados: conectado ao Worker publicado na Cloudflare.
 
-const OPORTUNIDADES_URL = 'data/oportunidades.sample.json';
-const CORRETORES_URL = 'data/corretores.sample.json';
+const OPORTUNIDADES_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/oportunidades';
+const CORRETORES_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/corretores';
 
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['descartado', 'abordado']);
 

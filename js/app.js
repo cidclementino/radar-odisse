@@ -3,6 +3,7 @@
 // Fonte de dados: conectado ao Worker publicado na Cloudflare.
 
 const DATA_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos';
+const CONCURSO_URL = id => `https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos/${encodeURIComponent(id)}`;
 
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['descartado', 'inscrito']);
 
@@ -17,6 +18,11 @@ const ESCOPO_LABELS = {
   paisagismo: 'Paisagismo',
   design_produto_mobiliario: 'Design de Produto',
 };
+
+// Estado local dos concursos carregados — atualizado in-place quando o
+// usuário descarta/restaura/apaga um card, pra não precisar recarregar a
+// lista inteira do Worker a cada ação.
+let concursosState = [];
 
 function diasAte(dataISO) {
   if (!dataISO) return null;
@@ -78,6 +84,8 @@ function renderDetalhe(concurso) {
       ? 'Ainda não definida'
       : null;
 
+  const descartado = concurso.status_interno === 'descartado';
+
   return `
     <div class="concurso__detail">
       <div class="concurso__detail-grid">
@@ -89,8 +97,46 @@ function renderDetalhe(concurso) {
         ${campoDetalhe('Entrega do projeto', concurso.datas?.entrega_fim)}
       </div>
       ${link ? `<a class="concurso__detail-link" href="${escapeHTML(link)}" target="_blank" rel="noopener">${linkTexto}</a>` : ''}
+      <div class="concurso__actions">
+        <button type="button" class="concurso__action-btn concurso__action-btn--descartar" data-action="${descartado ? 'restaurar' : 'descartar'}">
+          ${descartado ? 'Restaurar' : 'Descartar'}
+        </button>
+        <button type="button" class="concurso__action-btn concurso__action-btn--apagar" data-action="apagar">
+          Apagar
+        </button>
+      </div>
     </div>
   `;
+}
+
+/** Chama o Worker pra mudar status_interno (descartar/restaurar). Retorna o item atualizado ou null se falhar. */
+async function atualizarStatus(id, status_interno) {
+  try {
+    const res = await fetch(CONCURSO_URL(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status_interno }),
+    });
+    if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Falha ao atualizar status do concurso:', err);
+    alert('Não foi possível atualizar esse concurso agora. Tenta de novo em instantes.');
+    return null;
+  }
+}
+
+/** Chama o Worker pra apagar definitivamente. Retorna true se deu certo. */
+async function apagarConcurso(id) {
+  try {
+    const res = await fetch(CONCURSO_URL(id), { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
+    return true;
+  } catch (err) {
+    console.error('Falha ao apagar concurso:', err);
+    alert('Não foi possível apagar esse concurso agora. Tenta de novo em instantes.');
+    return false;
+  }
 }
 
 function renderCard(concurso) {
@@ -103,6 +149,7 @@ function renderCard(concurso) {
   el.className = `concurso concurso--${cor}${hiddenStatus ? ' concurso--hidden-status' : ''}`;
   el.dataset.status = concurso.status_interno;
   el.dataset.encerrado = String(encerrado);
+  el.dataset.id = concurso.id;
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
   el.setAttribute('aria-expanded', 'false');
@@ -150,6 +197,40 @@ function renderCard(concurso) {
   const linkDetalhe = el.querySelector('.concurso__detail-link');
   if (linkDetalhe) linkDetalhe.addEventListener('click', e => e.stopPropagation());
 
+  // Botões de ação — não podem deixar o clique propagar pro card (senão
+  // ele expande/recolhe ao mesmo tempo que a ação roda).
+  const toggle = document.getElementById('toggle-all');
+
+  const btnDescartar = el.querySelector('.concurso__action-btn--descartar');
+  btnDescartar.addEventListener('click', async e => {
+    e.stopPropagation();
+    const acao = btnDescartar.dataset.action; // 'descartar' ou 'restaurar'
+    const novoStatus = acao === 'descartar' ? 'descartado' : 'monitorando';
+    btnDescartar.disabled = true;
+    const atualizado = await atualizarStatus(concurso.id, novoStatus);
+    btnDescartar.disabled = false;
+    if (!atualizado) return;
+
+    const idx = concursosState.findIndex(c => c.id === concurso.id);
+    if (idx !== -1) concursosState[idx] = atualizado;
+    render(concursosState, toggle.checked);
+  });
+
+  const btnApagar = el.querySelector('.concurso__action-btn--apagar');
+  btnApagar.addEventListener('click', async e => {
+    e.stopPropagation();
+    const confirmado = confirm(`Apagar definitivamente "${concurso.nome}"? Essa ação não pode ser desfeita.`);
+    if (!confirmado) return;
+
+    btnApagar.disabled = true;
+    const ok = await apagarConcurso(concurso.id);
+    btnApagar.disabled = false;
+    if (!ok) return;
+
+    concursosState = concursosState.filter(c => c.id !== concurso.id);
+    render(concursosState, toggle.checked);
+  });
+
   return el;
 }
 
@@ -187,16 +268,16 @@ function render(concursos, mostrarTodos) {
 async function init() {
   const toggle = document.getElementById('toggle-all');
 
-  let concursos = [];
   try {
     const res = await fetch(DATA_URL);
-    concursos = await res.json();
+    concursosState = await res.json();
   } catch (err) {
     console.error('Falha ao carregar dados do Radar:', err);
+    concursosState = [];
   }
 
-  render(concursos, toggle.checked);
-  toggle.addEventListener('change', () => render(concursos, toggle.checked));
+  render(concursosState, toggle.checked);
+  toggle.addEventListener('change', () => render(concursosState, toggle.checked));
 }
 
 init();

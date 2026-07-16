@@ -30,12 +30,26 @@ const API_KEY = process.env.YOUTUBE_API_KEY;
 const EXECUCAO_MANUAL = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
 
 // 0 = domingo ... 6 = sábado (Date#getDay())
+//
+// Queries deliberadamente amplas — só "terreno" + cidade/região. Testado
+// e confirmado: incluir "corretor"/"permuta" na própria busca (em vez de
+// só no filtro pós-busca) faz a API do YouTube não retornar nada, mesmo
+// havendo vídeos relevantes no ar (ex: "terreno Recife" sozinho trouxe 9
+// itens recentes; "corretor terreno permuta Recife" trouxe 0). A busca
+// larga + classificarNivel() depois é o que dá precisão, não a query.
+//
+// Geografia revisada: Cabedelo é oficialmente parte da Região Metropolitana
+// de João Pessoa (não "litoral norte" separado) — movido pro grupo de
+// segunda. Conde e Jacumã são litoral SUL de João Pessoa (litoral norte de
+// verdade seria Lucena/Rio Tinto/Baía da Traição) — grupo renomeado e
+// completado com Pitimbu, mesma faixa. RM Recife, Campina Grande e RM
+// Natal ganharam os municípios satélite com mais atividade imobiliária.
 const ROTACAO = {
-  1: { grupo: 'RM João Pessoa', queries: ['corretor terreno permuta João Pessoa', 'terreno permuta Santa Rita PB', 'terreno permuta Bayeux'] },
-  2: { grupo: 'Litoral Norte', queries: ['corretor terreno permuta Cabedelo', 'terreno permuta Conde PB', 'terreno permuta Jacumã'] },
-  3: { grupo: 'Campina Grande', queries: ['corretor terreno permuta Campina Grande'] },
-  4: { grupo: 'Recife', queries: ['corretor terreno permuta Recife'] },
-  5: { grupo: 'Natal', queries: ['corretor terreno permuta Natal RN'] },
+  1: { grupo: 'RM João Pessoa', queries: ['terreno João Pessoa', 'terreno Santa Rita PB', 'terreno Bayeux', 'terreno Cabedelo'] },
+  2: { grupo: 'Litoral Sul PB', queries: ['terreno Conde PB', 'terreno Jacumã', 'terreno Pitimbu'] },
+  3: { grupo: 'Campina Grande', queries: ['terreno Campina Grande', 'terreno Queimadas PB', 'terreno Lagoa Seca PB'] },
+  4: { grupo: 'RM Recife', queries: ['terreno Recife', 'terreno Olinda', 'terreno Jaboatão dos Guararapes', 'terreno Paulista PE', 'terreno Camaragibe', 'terreno Cabo de Santo Agostinho'] },
+  5: { grupo: 'RM Natal', queries: ['terreno Natal RN', 'terreno Parnamirim RN', 'terreno São Gonçalo do Amarante RN', 'terreno Macaíba RN'] },
 };
 
 /** Termos que indicam disposição explícita de permuta/parceria no anúncio. */

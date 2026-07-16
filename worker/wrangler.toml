@@ -5,10 +5,10 @@ compatibility_date = "2026-07-01"
 # Depois de criar os namespaces (wrangler kv namespace create CONCURSOS / REVISAO),
 # troque os ids abaixo pelos reais.
 kv_namespaces = [
-  { binding = "CONCURSOS", id = "SUBSTITUIR_PELO_ID_REAL" },
-  { binding = "REVISAO", id = "SUBSTITUIR_PELO_ID_REAL" },
-  { binding = "OPORTUNIDADES", id = "SUBSTITUIR_PELO_ID_REAL" },
-  { binding = "CORRETORES", id = "SUBSTITUIR_PELO_ID_REAL" },
+  { binding = "CONCURSOS", id = "c3832f3f687c4976bad2240e328a736f" },
+  { binding = "REVISAO", id = "34ddf653fcf044ea9871dc072844493d" },
+  { binding = "OPORTUNIDADES", id = "6f2980b7894b4b7eb1582795b996b0f4" },
+  { binding = "CORRETORES", id = "d2e2967d78be465c81937cb130bd20c0" },
 ]
 
 # Defina com: wrangler secret put COLLECT_SECRET

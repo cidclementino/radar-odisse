@@ -6,6 +6,21 @@
 //
 // Todo parser de fonte deve seguir esse mesmo contrato — isso é o que
 // permite o worker/collect tratar todas as fontes de forma uniforme.
+//
+// FILTRO DE SEÇÃO EDITORIAL: o portal publica em duas seções distintas
+// misturadas no mesmo feed — "Anúncios de Concursos" (chamada aberta,
+// o que o Radar quer) e "Resultados e Projetos" (posts de premiação,
+// publicados depois que o concurso já fechou e tem vencedor definido).
+// Sem filtro, posts de premiação ("Premiados – X") entram no painel como
+// se fossem oportunidade aberta, o que é ruído puro — não há inscrição
+// possível num concurso já julgado.
+//
+// O filtro usa duas camadas, nessa ordem de confiança:
+//   1. Categoria do RSS (item.categories) — se o WordPress expõe a seção
+//      ("Resultados e Projetos", "Premiados" etc.), é o sinal mais confiável.
+//   2. Padrão de título — todo post de resultado observado no histórico do
+//      site (2009-2026) começa com "Premiados –" ou contém "premiados e
+//      menções". Fallback pro caso da categoria não vir no RSS.
 
 const Parser = require('rss-parser');
 const { generateId, extractDates } = require('./lib/normalize');
@@ -21,6 +36,22 @@ const rssParser = new Parser({
     ],
   },
 });
+
+/** Categoria do RSS bate com a seção de resultado/premiação. */
+const RE_CATEGORIA_RESULTADO = /(resultado|premia)/i;
+
+/** Título segue o padrão observado dos posts de resultado. */
+const RE_TITULO_RESULTADO = /^premiados\b|premiados e men[çc][õo]es/i;
+
+/**
+ * true se o post é de resultado/premiação (concurso já encerrado, já tem
+ * vencedor) — ou seja, não é uma oportunidade de inscrição aberta.
+ */
+function ehPostDeResultado(item) {
+  const categorias = (item.categories || []).join(' ');
+  if (RE_CATEGORIA_RESULTADO.test(categorias)) return true;
+  return RE_TITULO_RESULTADO.test((item.title || '').trim());
+}
 
 /** Extrai a primeira URL de imagem do HTML do post (capa/banner). */
 function extrairImagem(item) {
@@ -67,46 +98,62 @@ function classificarEscopo(titulo, categorias) {
 async function parse() {
   const feed = await rssParser.parseURL(FEED_URL);
 
-  return feed.items.map(item => {
-    const categorias = item.categories || [];
-    const htmlCompleto = item.contentEncoded || item.content || '';
-    const textoBruto = (item.contentSnippet || item.content || '').slice(0, 500);
-    const { inscricao_fim, entrega_fim } = extractDates(textoBruto);
-    const linkOficial = extrairLinkOficial(htmlCompleto);
+  let descartadosResultado = 0;
 
-    return {
-      id: generateId(FONTE, item.link, item.title),
-      nome: item.title?.trim() || null,
-      promotor: null,               // raramente estruturado no RSS — fica pra revisão manual
-      local_projeto: null,          // idem — extraído do texto quando possível em versões futuras
-      destinado_a: null,
-      escopo: classificarEscopo(item.title, categorias),
-      tipo: classificarTipo(categorias),
-      imagem_url: extrairImagem(item),
-      premio: null, // raramente estruturado no RSS — fica pra revisão manual
+  const concursos = feed.items
+    .filter(item => {
+      if (ehPostDeResultado(item)) {
+        descartadosResultado++;
+        return false;
+      }
+      return true;
+    })
+    .map(item => {
+      const categorias = item.categories || [];
+      const htmlCompleto = item.contentEncoded || item.content || '';
+      const textoBruto = (item.contentSnippet || item.content || '').slice(0, 500);
+      const { inscricao_fim, entrega_fim } = extractDates(textoBruto);
+      const linkOficial = extrairLinkOficial(htmlCompleto);
 
-      inscricao: { gratuita: null, custo: null, obs: null },
+      return {
+        id: generateId(FONTE, item.link, item.title),
+        nome: item.title?.trim() || null,
+        promotor: null,               // raramente estruturado no RSS — fica pra revisão manual
+        local_projeto: null,          // idem — extraído do texto quando possível em versões futuras
+        destinado_a: null,
+        escopo: classificarEscopo(item.title, categorias),
+        tipo: classificarTipo(categorias),
+        imagem_url: extrairImagem(item),
+        premio: null, // raramente estruturado no RSS — fica pra revisão manual
 
-      banca_definida: null,
-      banca_obs: null,
+        inscricao: { gratuita: null, custo: null, obs: null },
 
-      datas: {
-        inscricao_fim,
-        entrega_fim,
-        resultado_previsto: null,
-        texto_bruto: textoBruto,
-      },
+        banca_definida: null,
+        banca_obs: null,
 
-      link_oficial: linkOficial, // null se não encontrado no conteúdo — nunca usa o link do agregador
-      status_interno: 'monitorando',
-      motivo_descarte: null,
+        datas: {
+          inscricao_fim,
+          entrega_fim,
+          resultado_previsto: null,
+          texto_bruto: textoBruto,
+        },
 
-      fontes: [FONTE],
-      fonte_url_original: item.link,
-      coletado_em: new Date().toISOString(),
-      atualizado_em: new Date().toISOString(),
-    };
-  });
+        link_oficial: linkOficial, // null se não encontrado no conteúdo — nunca usa o link do agregador
+        status_interno: 'monitorando',
+        motivo_descarte: null,
+
+        fontes: [FONTE],
+        fonte_url_original: item.link,
+        coletado_em: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+      };
+    });
+
+  if (descartadosResultado > 0) {
+    console.log(`[concursosdeprojeto.org] ${descartadosResultado} post(s) de resultado/premiação descartado(s) (não são oportunidade aberta).`);
+  }
+
+  return concursos;
 }
 
 module.exports = { parse, FONTE };

@@ -62,12 +62,16 @@ function gruposDaExecucao() {
 }
 
 async function buscarQuery(query, publishedAfter) {
+  // IMPORTANTE: não usar order=date aqui. Comportamento observado e
+  // confirmado em teste manual: combinar order=date com publishedAfter faz
+  // a API devolver items: [] mesmo com totalResults > 0 — inconsistência
+  // conhecida da própria API, não um erro de query/chave/cota. A ordenação
+  // por data é feita abaixo, no próprio código, depois da resposta.
   const params = new URLSearchParams({
     key: API_KEY,
     q: query,
     part: 'snippet',
     type: 'video',
-    order: 'date',
     regionCode: 'BR',
     relevanceLanguage: 'pt',
     publishedAfter,
@@ -80,7 +84,12 @@ async function buscarQuery(query, publishedAfter) {
     throw new Error(`YouTube API retornou ${res.status}: ${body.slice(0, 200)}`);
   }
   const data = await res.json();
-  return data.items || [];
+  const items = data.items || [];
+
+  // Mais recente primeiro — substitui o order=date que tirávamos da API.
+  items.sort((a, b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+
+  return items;
 }
 
 /**

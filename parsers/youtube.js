@@ -125,6 +125,20 @@ async function parse() {
     for (const query of grupo.queries) {
       try {
         const items = await buscarQuery(query, publishedAfter);
+
+        // Diagnóstico: mostra quantos itens a API devolveu e como cada um
+        // foi classificado, antes de qualquer descarte. Ajuda a distinguir
+        // "a API não retornou o vídeo" de "o filtro descartou o vídeo".
+        const contagem = { 2: 0, 1: 0, descartado: 0 };
+        for (const it of items) {
+          const n = classificarNivel(it);
+          contagem[n === null ? 'descartado' : n]++;
+        }
+        console.log(
+          `[youtube.com] "${query}": API retornou ${items.length} item(ns) — ` +
+          `nível 2: ${contagem[2]}, nível 1: ${contagem[1]}, descartado: ${contagem.descartado}`
+        );
+
         for (const item of items) {
           const nivel = classificarNivel(item);
           if (nivel === null) continue;

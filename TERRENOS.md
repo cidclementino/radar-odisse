@@ -155,6 +155,19 @@ CNPJ/SPE (Receita Federal), Diário/Semanário Oficial de João Pessoa, imprensa
 local (3 maiores portais PB), Sinduscon-PB, Índice CRECI 360º — motivos
 detalhados na diretriz original, seção 4.
 
+## Janela de frescor (OLX)
+
+Anúncios da OLX com `publicado_em` mais antigo que a janela configurada são
+descartados antes de virar `Oportunidade` — evita reabrir sinais já frios.
+Valor atual: **30 dias**, deliberadamente frouxo pro levantamento inicial
+(ver `JANELA_DIAS` em `parsers/olx.js`) — reduzir pra 7 dias depois de validar
+o volume real de resultados. Anúncios sem timestamp extraído com sucesso não
+são descartados por frescor (só por falta de dado, se for o caso).
+
+ZAP não tem esse filtro — `publicado_em` é sempre `null` lá (sem timestamp
+confiável por anúncio, ver seção de fontes acima). YouTube já tem seu próprio
+corte de 7 dias via `publishedAfter`, independente deste.
+
 ## Status da implementação (primeira rodada)
 
 - ✅ `terrenos.html` + `js/terrenos.js` — grid de Oportunidades + lista de Corretores

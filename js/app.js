@@ -1,10 +1,8 @@
 // Radar Odisse — renderização da pilha de concursos
 //
-// Fonte de dados: por enquanto lê data/concursos.sample.json (mock).
-// Na versão conectada ao Worker, troque DATA_URL pelo endpoint da API
-// (ex: 'https://radar-odisse-worker.<subdomain>.workers.dev/api/concursos').
+// Fonte de dados: conectado ao Worker publicado na Cloudflare.
 
-const DATA_URL = 'data/concursos.sample.json';
+const DATA_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos';
 
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['descartado', 'inscrito']);
 

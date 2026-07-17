@@ -8,6 +8,27 @@
 
 const parsers = require('../parsers');
 
+/**
+ * Busca os ids de Concurso que o Worker já conhece — permite que um parser
+ * (ex: competitionsarchi.js) pule o fetch de detalhe de itens já cadastrados
+ * em vez de reprocessar tudo a cada rodada. Rota pública (GET /api/concursos,
+ * ver worker/index.js), não precisa de COLLECT_SECRET.
+ *
+ * Falha aqui não é fatal — se o Worker estiver fora do ar, os parsers que
+ * usam o parâmetro simplesmente rodam sem a otimização (Set vazio).
+ */
+async function buscarIdsConhecidos(workerUrl) {
+  try {
+    const res = await fetch(`${workerUrl}/api/concursos`);
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const existentes = await res.json();
+    return new Set(existentes.map(c => c.id));
+  } catch (err) {
+    console.error('Não foi possível buscar ids conhecidos do Worker — seguindo sem otimização de skip:', err.message);
+    return new Set();
+  }
+}
+
 async function main() {
   const { WORKER_URL, COLLECT_SECRET } = process.env;
   if (!WORKER_URL || !COLLECT_SECRET) {
@@ -15,11 +36,16 @@ async function main() {
     process.exit(1);
   }
 
+  const idsConhecidos = await buscarIdsConhecidos(WORKER_URL);
+  console.log(`${idsConhecidos.size} concurso(s) já conhecido(s) pelo Worker.`);
+
   const candidatos = [];
 
   for (const parser of parsers) {
     try {
-      const itens = await parser.parse();
+      // Parsers que não usam o parâmetro (ex: concursosdeprojeto.js, que é
+      // RSS puro e não tem essa otimização) simplesmente o ignoram.
+      const itens = await parser.parse(idsConhecidos);
       console.log(`[${parser.FONTE}] ${itens.length} itens coletados`);
       candidatos.push(...itens);
     } catch (err) {

@@ -11,7 +11,7 @@
 //   GET    /api/concursos          -> lista todos os Concursos (usado pelo front-end estático)
 //   GET    /api/revisao            -> lista pendências de revisão manual (fase 2 da UI)
 //   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
-//   PATCH  /api/concursos/:id      -> atualiza status_interno de um Concurso (ex: descartar/restaurar)
+//   PATCH  /api/concursos/:id      -> atualiza status_interno e/ou apelido de um Concurso (ex: descartar/restaurar, renomear exibição)
 //   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
 //   GET    /api/oportunidades      -> lista todas as Oportunidades (Terrenos)
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
@@ -77,9 +77,14 @@ async function handleCollect(request, env) {
     await env.CONCURSOS.put(item.id, JSON.stringify(item));
   }
 
-  // Novos concursos (sem correspondência) entram direto
+  // Novos concursos (sem correspondência) entram direto — `apelido` começa
+  // igual ao `nome` capturado (ver RADAR.md, seção "Apelido de exibição");
+  // só é definido aqui, na criação, porque fundir() nunca deve mexer nele
+  // depois (é editável pelo usuário e não pode ser sobrescrito por uma
+  // recaptura, mesmo que o `nome` de origem mude).
   for (const item of resultado.novos) {
-    await env.CONCURSOS.put(item.id, JSON.stringify(item));
+    const comApelido = { ...item, apelido: item.apelido || item.nome };
+    await env.CONCURSOS.put(comApelido.id, JSON.stringify(comApelido));
   }
 
   // Conflitos vão pra fila de revisão manual, não sobrescrevem nada ainda
@@ -96,10 +101,11 @@ async function handleCollect(request, env) {
 }
 
 /**
- * PATCH /api/concursos/:id — atualiza o status_interno de um Concurso.
- * Usado pelos botões "Descartar" e "Restaurar" no card. Não apaga nada do
- * KV — só muda o campo, que já é respeitado pelo front-end pra
- * esconder/mostrar o item (ver STATUS_HIDDEN_BY_DEFAULT em js/app.js).
+ * PATCH /api/concursos/:id — atualiza status_interno e/ou apelido de um
+ * Concurso. Aceita os dois campos de forma independente (pode mandar só um
+ * dos dois) — usado pelos botões "Descartar"/"Restaurar" (status_interno) e
+ * pelo campo de edição de apelido no painel de detalhe (ver js/app.js).
+ * Não apaga nada do KV — só muda os campos enviados.
  */
 async function handlePatchConcurso(request, env, id) {
   const existente = await env.CONCURSOS.get(id, 'json');
@@ -113,17 +119,29 @@ async function handlePatchConcurso(request, env, id) {
   } catch {
     return json({ error: 'corpo inválido — esperado JSON' }, 400);
   }
+  body = body || {};
 
-  const { status_interno } = body || {};
-  if (!STATUS_VALIDOS.has(status_interno)) {
-    return json({ error: `status_interno inválido — use um de: ${[...STATUS_VALIDOS].join(', ')}` }, 400);
+  if (!('status_interno' in body) && !('apelido' in body)) {
+    return json({ error: 'nada pra atualizar — envie status_interno e/ou apelido' }, 400);
   }
 
-  const atualizado = {
-    ...existente,
-    status_interno,
-    atualizado_em: new Date().toISOString(),
-  };
+  const atualizado = { ...existente, atualizado_em: new Date().toISOString() };
+
+  if ('status_interno' in body) {
+    if (!STATUS_VALIDOS.has(body.status_interno)) {
+      return json({ error: `status_interno inválido — use um de: ${[...STATUS_VALIDOS].join(', ')}` }, 400);
+    }
+    atualizado.status_interno = body.status_interno;
+  }
+
+  if ('apelido' in body) {
+    const apelido = typeof body.apelido === 'string' ? body.apelido.trim() : '';
+    if (!apelido) {
+      return json({ error: 'apelido não pode ser vazio — envie o nome original se quiser resetar' }, 400);
+    }
+    atualizado.apelido = apelido;
+  }
+
   await env.CONCURSOS.put(id, JSON.stringify(atualizado));
 
   return json(atualizado);

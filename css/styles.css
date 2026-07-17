@@ -121,6 +121,10 @@ a { color: inherit; }
 .stack {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  /* FIX: sem isso, o grid estica todo card da mesma linha até a altura do
+     mais alto (comportamento padrão de align-items: stretch) — abrir UM
+     card expandia visualmente os vizinhos, mesmo sem conteúdo novo neles. */
+  align-items: start;
   gap: 18px;
 }
 
@@ -151,7 +155,7 @@ a { color: inherit; }
 
 .concurso__banner {
   width: 100%;
-  height: 120px;
+  aspect-ratio: 5 / 4;
   background-color: rgba(244, 244, 244, 0.04);
   background-size: cover;
   background-position: center;
@@ -297,7 +301,6 @@ a { color: inherit; }
 }
 
 @media (max-width: 420px) {
-  .concurso__banner { height: 100px; }
   .concurso__deadline-count { font-size: 1.1rem; }
 }
 

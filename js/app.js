@@ -194,9 +194,15 @@ function renderCard(concurso) {
   el.setAttribute('role', 'button');
   el.setAttribute('aria-expanded', 'false');
 
-  const bannerStyle = concurso.imagem_url
-    ? `style="background-image:url('${concurso.imagem_url}')"`
-    : '';
+  // FIX (performance + escape que faltava): a versão anterior usava
+  // background-image inline sem escapar a URL (risco de quebrar o atributo
+  // se a URL tiver aspas) e o navegador baixava TODAS as imagens assim que
+  // o card era criado, mesmo fora da tela. `<img loading="lazy">` resolve os
+  // dois: escapa via escapeAttr, e só baixa quando o card está perto de
+  // entrar na viewport (suporte nativo do navegador, sem JS extra).
+  const banner = concurso.imagem_url
+    ? `<img class="concurso__banner" src="${escapeAttr(concurso.imagem_url)}" alt="" loading="lazy" decoding="async" />`
+    : `<div class="concurso__banner"></div>`;
 
   const tags = (concurso.escopo || [])
     .map(e => `<span class="tag">${escapeHTML(ESCOPO_LABELS[e] || e)}</span>`)
@@ -209,7 +215,7 @@ function renderCard(concurso) {
       : '';
 
   el.innerHTML = `
-    <div class="concurso__banner" ${bannerStyle}></div>
+    ${banner}
     <div class="concurso__row">
       <div class="concurso__body">
         <div class="concurso__eyebrow">${tags}</div>

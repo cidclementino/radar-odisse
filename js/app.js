@@ -60,6 +60,14 @@ function escapeHTML(str) {
   return div.innerHTML;
 }
 
+// escapeHTML (via textContent->innerHTML) NÃO escapa aspas — correto pra texto
+// solto, mas quebra se usado dentro de um atributo tipo value="...". Usado
+// especificamente no <input> de apelido, que é o primeiro lugar do código
+// que injeta valor dinâmico dentro de um atributo HTML (não só como texto).
+function escapeAttr(str) {
+  return escapeHTML(str).replace(/"/g, '&quot;');
+}
+
 function campoDetalhe(label, valor) {
   if (valor === null || valor === undefined || valor === '') return '';
   return `
@@ -85,10 +93,25 @@ function renderDetalhe(concurso) {
       : null;
 
   const descartado = concurso.status_interno === 'descartado';
+  const apelidoAtual = concurso.apelido || concurso.nome;
 
   return `
     <div class="concurso__detail">
+      <div class="concurso__apelido">
+        <label class="concurso__detail-label" for="apelido-${escapeHTML(concurso.id)}">Apelido de exibição</label>
+        <div class="concurso__apelido-row">
+          <input
+            type="text"
+            id="apelido-${escapeHTML(concurso.id)}"
+            class="concurso__apelido-input"
+            value="${escapeAttr(apelidoAtual)}"
+            maxlength="200"
+          />
+          <button type="button" class="concurso__action-btn concurso__apelido-salvar">Salvar</button>
+        </div>
+      </div>
       <div class="concurso__detail-grid">
+        ${campoDetalhe('Nome capturado (original)', concurso.nome)}
         ${campoDetalhe('Promotor', concurso.promotor)}
         ${campoDetalhe('Destinado a', concurso.destinado_a)}
         ${campoDetalhe('Inscrição', custoTexto)}
@@ -122,6 +145,23 @@ async function atualizarStatus(id, status_interno) {
   } catch (err) {
     console.error('Falha ao atualizar status do concurso:', err);
     alert('Não foi possível atualizar esse concurso agora. Tenta de novo em instantes.');
+    return null;
+  }
+}
+
+/** Chama o Worker pra mudar o apelido de exibição. Retorna o item atualizado ou null se falhar. */
+async function atualizarApelido(id, apelido) {
+  try {
+    const res = await fetch(CONCURSO_URL(id), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apelido }),
+    });
+    if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error('Falha ao atualizar apelido do concurso:', err);
+    alert('Não foi possível salvar o apelido agora. Tenta de novo em instantes.');
     return null;
   }
 }
@@ -173,7 +213,7 @@ function renderCard(concurso) {
     <div class="concurso__row">
       <div class="concurso__body">
         <div class="concurso__eyebrow">${tags}</div>
-        <h2 class="concurso__title"><span class="concurso__title-text">${escapeHTML(concurso.nome)}</span></h2>
+        <h2 class="concurso__title"><span class="concurso__title-text">${escapeHTML(concurso.apelido || concurso.nome)}</span></h2>
         <p class="concurso__place">${escapeHTML(concurso.local_projeto)}</p>
       </div>
       <div class="concurso__footer">
@@ -229,6 +269,41 @@ function renderCard(concurso) {
 
     concursosState = concursosState.filter(c => c.id !== concurso.id);
     render(concursosState, toggle.checked);
+  });
+
+  // Campo de apelido — precisa impedir clique/tecla de propagar pro card
+  // (senão digitar ou clicar no input expande/recolhe o painel sem querer).
+  const inputApelido = el.querySelector('.concurso__apelido-input');
+  const btnSalvarApelido = el.querySelector('.concurso__apelido-salvar');
+  const tituloEl = el.querySelector('.concurso__title-text');
+
+  inputApelido.addEventListener('click', e => e.stopPropagation());
+  inputApelido.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); btnSalvarApelido.click(); }
+  });
+
+  btnSalvarApelido.addEventListener('click', async e => {
+    e.stopPropagation();
+    const novoApelido = inputApelido.value.trim();
+    if (!novoApelido) {
+      alert('O apelido não pode ficar vazio — se quiser voltar ao nome capturado, cole ele aqui.');
+      return;
+    }
+
+    btnSalvarApelido.disabled = true;
+    const atualizado = await atualizarApelido(concurso.id, novoApelido);
+    btnSalvarApelido.disabled = false;
+    if (!atualizado) return;
+
+    const idx = concursosState.findIndex(c => c.id === concurso.id);
+    if (idx !== -1) concursosState[idx] = atualizado;
+
+    // Atualiza só o título na tela, sem chamar render() inteiro — diferente
+    // de descartar/apagar, renomear não muda ordenação nem visibilidade do
+    // card, então não há motivo pra recolher o painel que o usuário acabou
+    // de usar.
+    tituloEl.textContent = atualizado.apelido || atualizado.nome;
   });
 
   return el;

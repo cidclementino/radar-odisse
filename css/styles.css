@@ -136,7 +136,11 @@ a { color: inherit; }
 .concurso {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  /* FIX (2ª parte): `height: 100%` sobrescreve o `align-items: start` do
+     `.stack` — força o card a ocupar 100% da célula do grid, que continua
+     tão alta quanto o card mais alto da linha (isso o Grid sempre calcula
+     assim, independente do align-items). Sem altura explícita, o card fica
+     do tamanho do seu próprio conteúdo — que é o comportamento que queremos. */
   border: 1px solid var(--line);
   border-left: 3px solid var(--slate);
   border-radius: 4px;
@@ -154,11 +158,12 @@ a { color: inherit; }
 .concurso--hidden-status { opacity: 0.5; }
 
 .concurso__banner {
+  display: block;
   width: 100%;
   aspect-ratio: 5 / 4;
-  background-color: rgba(244, 244, 244, 0.04);
-  background-size: cover;
-  background-position: center;
+  background-color: rgba(244, 244, 244, 0.04); /* placeholder (div, sem imagem) */
+  object-fit: cover; /* usado quando é <img> */
+  object-position: center;
   border-bottom: 1px solid var(--line);
 }
 

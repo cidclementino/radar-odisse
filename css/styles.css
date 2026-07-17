@@ -233,6 +233,36 @@ a { color: inherit; }
 }
 @media (max-width: 560px) { .concurso__detail-grid { grid-template-columns: 1fr; } }
 
+/* ---------- apelido de exibição (editável, separado do nome capturado) ---------- */
+
+.concurso__apelido { padding-top: 16px; }
+.concurso__apelido-row { display: flex; gap: 8px; margin-top: 4px; }
+
+.concurso__apelido-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--ui);
+  font-size: 0.86rem;
+  color: var(--paper);
+  background: rgba(244, 244, 244, 0.05);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 7px 10px;
+}
+.concurso__apelido-input:focus {
+  outline: none;
+  border-color: var(--copper-strong);
+}
+
+.concurso__apelido-salvar {
+  flex-shrink: 0;
+  border-color: var(--copper-strong);
+  color: var(--copper-strong);
+}
+.concurso__apelido-salvar:hover {
+  background: rgba(216, 162, 99, 0.1);
+}
+
 .concurso__detail-item { min-width: 0; }
 .concurso__detail-label {
   font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase;

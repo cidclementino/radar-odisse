@@ -76,7 +76,8 @@ function resolverLinkCompeticao(href) {
   return `${BASE}/competition/${m[1]}/`;
 }
 
-const REGEX_BLOCO = /Submission:\s*([^R]+?)\s*Registration:\s*([^L]+?)\s*Location:\s*([^L]+?)\s*Language:\s*([^P]+?)\s*Prizes:\s*([^T]+?)(?:\s*Type:\s*(.+))?$/i;
+// Labels do cabeçalho, na ordem em que aparecem no site.
+const CAMPOS_CABECALHO = ['Submission', 'Registration', 'Location', 'Language', 'Prizes', 'Type'];
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -85,7 +86,11 @@ function sleep(ms) {
 /** Sobe pelos ancestrais até achar um bloco de texto com o cabeçalho Submission/Registration. */
 function acharBlocoListagem($, $anchor) {
   let $el = $anchor;
-  for (let i = 0; i < 6; i++) {
+  // 8 níveis de folga (subi de 6 pra 8 depois da 1ª rodada real) — o bloco de
+  // meta-informação (Submission/Registration/...) pode estar bem mais acima
+  // na árvore do que o link do título, dependendo de como o tema organiza o
+  // card.
+  for (let i = 0; i < 8; i++) {
     const texto = $el.text();
     if (/Submission:/i.test(texto) && /Registration:/i.test(texto)) return $el;
     if (!$el.parent().length) break;
@@ -94,17 +99,69 @@ function acharBlocoListagem($, $anchor) {
   return null;
 }
 
+/**
+ * Extrai o valor de um campo do tipo "Label: valor" olhando pro próximo label
+ * conhecido como fronteira, em vez de tentar excluir caracteres específicos —
+ * a primeira versão (REGEX_BLOCO) usava `[^T]` como delimitador, que com a
+ * flag /i exclui "t" minúsculo também, e quebrava em qualquer bloco de texto
+ * real (que tem "t" a cada duas palavras).
+ *
+ * Duas etapas propositalmente separadas (uma tentativa de fundir as duas numa
+ * regex só com lookahead + limite de tamanho fixo quebrou de novo: quando o
+ * campo é o último do cabeçalho — ex: "Type", sem próximo label — o "fim da
+ * string" real fica muito além do limite de tamanho, e as duas condições do
+ * lookahead nunca se satisfazem ao mesmo tempo):
+ *   1. Acha a posição do próximo label conhecido, sem limite de tamanho.
+ *   2. Só corta num tamanho razoável (`MAX_TAMANHO_CAMPO`) se não achou
+ *      nenhum próximo label — o que significa que o resto do texto é
+ *      resumo/título da competição, não mais o cabeçalho.
+ *
+ * LIMITAÇÃO CONHECIDA: quando `Prizes` ou `Type` são o último campo presente
+ * (sem outro label depois), o corte por tamanho é só uma redução de dano —
+ * ainda pode vazar o início do título/resumo, porque o texto flatten (via
+ * cheerio `.text()`) perde qualquer marcador de onde o valor de fato termina
+ * (isso só se resolve olhando a estrutura HTML real, ex: se o valor está num
+ * `<span>` próprio). Valores nesse caso podem sair imprecisos — melhor cair
+ * pra revisão manual do que perder o item inteiro.
+ */
+const MAX_TAMANHO_CAMPO = 40;
+
+function extrairCampo(texto, label) {
+  const mLabel = texto.match(new RegExp(`\\b${label}\\s*:\\s*`, 'i'));
+  if (!mLabel) return null;
+
+  const aposLabel = texto.slice(mLabel.index + mLabel[0].length);
+  const outros = CAMPOS_CABECALHO.filter(l => l !== label);
+
+  let fim = null;
+  for (const outro of outros) {
+    const mOutro = aposLabel.match(new RegExp(`\\b${outro}\\s*:`, 'i'));
+    if (mOutro && (fim === null || mOutro.index < fim)) fim = mOutro.index;
+  }
+
+  const valor = fim === null
+    ? aposLabel.slice(0, MAX_TAMANHO_CAMPO) // sem próximo label -> resto é resumo/título, corta
+    : aposLabel.slice(0, fim);
+
+  const limpo = valor.trim();
+  return limpo || null;
+}
+
 /** Extrai os campos estruturados do cabeçalho (Submission/Registration/Location/...). */
 function extrairCabecalho(textoBloco) {
-  const m = textoBloco.match(REGEX_BLOCO);
-  if (!m) return null;
-  const [, submission, registration, location, , prizes, type] = m;
+  const submission = extrairCampo(textoBloco, 'Submission');
+  const registration = extrairCampo(textoBloco, 'Registration');
+  // Submission + Registration são os dois campos que garantem que isso é de
+  // fato um card de competição (todo item da listagem tem os dois) — sem
+  // eles, não vale a pena tentar os outros campos.
+  if (!submission || !registration) return null;
+
   return {
-    submissionTexto: submission.trim(),
-    registrationTexto: registration.trim(),
-    location: location.trim(),
-    prizes: prizes.trim(),
-    type: type ? type.trim() : null,
+    submissionTexto: submission,
+    registrationTexto: registration,
+    location: extrairCampo(textoBloco, 'Location'),
+    prizes: extrairCampo(textoBloco, 'Prizes'),
+    type: extrairCampo(textoBloco, 'Type'),
   };
 }
 
@@ -164,6 +221,8 @@ async function buscarPaginaListagem(categoria, pagina) {
 
   const vistos = new Set(); // um item aparece várias vezes (thumb + título) na mesma listagem
   const itens = [];
+  let semBloco = 0;
+  let semCabecalho = 0;
 
   $('a[href]').each((_, el) => {
     const linkCanonico = resolverLinkCompeticao($(el).attr('href'));
@@ -171,10 +230,10 @@ async function buscarPaginaListagem(categoria, pagina) {
     if (vistos.has(linkCanonico)) return;
 
     const $bloco = acharBlocoListagem($, $(el));
-    if (!$bloco) return; // provavelmente um link de navegação/thumb solto, não um card de competição
+    if (!$bloco) { semBloco++; return; } // provavelmente um link de navegação/thumb solto, não um card de competição
 
     const cabecalho = extrairCabecalho($bloco.text().replace(/\s+/g, ' ').trim());
-    if (!cabecalho) return;
+    if (!cabecalho) { semCabecalho++; return; }
 
     // Título: costuma ser o texto do próprio link, ou de um <a> vizinho em negrito.
     const titulo = ($(el).attr('title') || $(el).text() || '').trim();
@@ -183,6 +242,8 @@ async function buscarPaginaListagem(categoria, pagina) {
     vistos.add(linkCanonico);
     itens.push({ link: linkCanonico, titulo, ...cabecalho });
   });
+
+  console.log(`[competitions.archi] funil ${url}: itens_ok=${itens.length} sem_bloco=${semBloco} sem_cabecalho=${semCabecalho}`);
 
   return itens;
 }

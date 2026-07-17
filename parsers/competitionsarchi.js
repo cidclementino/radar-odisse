@@ -201,6 +201,37 @@ function classificarEscopoPorCategorias(categorias) {
   return [...new Set(escopo)];
 }
 
+/**
+ * Escolhe o melhor candidato a título entre as âncoras que apontam pro mesmo
+ * link. BUG CORRIGIDO: a versão anterior usava o texto da PRIMEIRA âncora
+ * encontrada — em vários cards essa âncora envolve o card inteiro (imagem +
+ * cabeçalho + resumo), então `nome` saía com o bloco inteiro colado, não só
+ * o título (visível na interface — card mostrando o texto todo em vez do
+ * nome do concurso).
+ *
+ * Estratégia: entre todas as âncoras pro mesmo link, descarta qualquer uma
+ * cujo texto contenha "Submission:" (é o card inteiro, não é título) e fica
+ * com a mais curta das que sobrarem — título de verdade é sempre bem mais
+ * curto que um resumo. Se NENHUMA âncora sobrar (ou seja, o card inteiro é
+ * uma coisa só, sem link de título isolado), cai no fallback: usa o texto
+ * antes da primeira ocorrência de "Submission:" no bloco de cabeçalho — no
+ * HTML observado, o título aparece colado logo antes desse ponto.
+ */
+function escolherTitulo($, anchors, textoBloco) {
+  let melhor = null;
+  for (const el of anchors) {
+    const texto = ($(el).attr('title') || $(el).text() || '').trim().replace(/\s+/g, ' ');
+    if (!texto || /Submission:/i.test(texto)) continue;
+    if (!melhor || texto.length < melhor.length) melhor = texto;
+  }
+  if (melhor) return melhor;
+
+  const idx = textoBloco.search(/Submission:/i);
+  if (idx <= 0) return null;
+  const candidato = textoBloco.slice(0, idx).trim();
+  return candidato || null;
+}
+
 /** Busca uma página de listagem e devolve os itens "crus" (sem link oficial, sem categories reais ainda). */
 async function buscarPaginaListagem(categoria, pagina) {
   const url = pagina === 1
@@ -219,31 +250,41 @@ async function buscarPaginaListagem(categoria, pagina) {
   const mencoesSubmission = (html.match(/Submission:/gi) || []).length;
   console.log(`[competitions.archi] debug ${url}: status=${res.status} bytes=${html.length} links_competicao=${anchorsCompeticao} mencoes_submission=${mencoesSubmission}`);
 
-  const vistos = new Set(); // um item aparece várias vezes (thumb + título) na mesma listagem
-  const itens = [];
-  let semBloco = 0;
-  let semCabecalho = 0;
-
+  // Agrupa TODAS as âncoras por link canônico (não só a primeira) — um card
+  // normalmente tem 2+ âncoras pro mesmo link (thumb + título), e precisamos
+  // olhar todas pra achar a que tem só o título limpo.
+  const anchorsPorLink = new Map();
   $('a[href]').each((_, el) => {
     const linkCanonico = resolverLinkCompeticao($(el).attr('href'));
     if (!linkCanonico) return;
-    if (vistos.has(linkCanonico)) return;
-
-    const $bloco = acharBlocoListagem($, $(el));
-    if (!$bloco) { semBloco++; return; } // provavelmente um link de navegação/thumb solto, não um card de competição
-
-    const cabecalho = extrairCabecalho($bloco.text().replace(/\s+/g, ' ').trim());
-    if (!cabecalho) { semCabecalho++; return; }
-
-    // Título: costuma ser o texto do próprio link, ou de um <a> vizinho em negrito.
-    const titulo = ($(el).attr('title') || $(el).text() || '').trim();
-    if (!titulo) return;
-
-    vistos.add(linkCanonico);
-    itens.push({ link: linkCanonico, titulo, ...cabecalho });
+    if (!anchorsPorLink.has(linkCanonico)) anchorsPorLink.set(linkCanonico, []);
+    anchorsPorLink.get(linkCanonico).push(el);
   });
 
-  console.log(`[competitions.archi] funil ${url}: itens_ok=${itens.length} sem_bloco=${semBloco} sem_cabecalho=${semCabecalho}`);
+  const itens = [];
+  let semBloco = 0;
+  let semCabecalho = 0;
+  let semTitulo = 0;
+
+  for (const [linkCanonico, anchors] of anchorsPorLink) {
+    let $bloco = null;
+    for (const el of anchors) {
+      $bloco = acharBlocoListagem($, $(el));
+      if ($bloco) break;
+    }
+    if (!$bloco) { semBloco++; continue; } // provavelmente um link de navegação/thumb solto, não um card de competição
+
+    const textoBloco = $bloco.text().replace(/\s+/g, ' ').trim();
+    const cabecalho = extrairCabecalho(textoBloco);
+    if (!cabecalho) { semCabecalho++; continue; }
+
+    const titulo = escolherTitulo($, anchors, textoBloco);
+    if (!titulo) { semTitulo++; continue; }
+
+    itens.push({ link: linkCanonico, titulo, ...cabecalho });
+  }
+
+  console.log(`[competitions.archi] funil ${url}: itens_ok=${itens.length} sem_bloco=${semBloco} sem_cabecalho=${semCabecalho} sem_titulo=${semTitulo}`);
 
   return itens;
 }

@@ -44,15 +44,17 @@ function json(data, status = 200) {
   });
 }
 
+// FIX (performance): a versão anterior fazia `await kv.get()` um de cada vez,
+// dentro do for — com N chaves no KV, isso soma N idas-e-voltas sequenciais
+// (e cresce a cada nova captura). Buscar em paralelo por página faz o tempo
+// total ficar próximo do tempo da leitura mais lenta, não da soma de todas.
 async function listAll(kv) {
   const out = [];
   let cursor;
   do {
     const page = await kv.list({ cursor });
-    for (const key of page.keys) {
-      const value = await kv.get(key.name, 'json');
-      if (value) out.push(value);
-    }
+    const valores = await Promise.all(page.keys.map(key => kv.get(key.name, 'json')));
+    out.push(...valores.filter(Boolean));
     cursor = page.cursor;
   } while (cursor);
   return out;

@@ -8,6 +8,7 @@
     "collect": "node scripts/collect-and-send.js",
     "collect:terrenos": "node scripts/collect-terrenos-and-send.js",
     "parse:concursosdeprojeto": "node parsers/concursosdeprojeto.js",
+    "parse:competitionsarchi": "node parsers/competitionsarchi.js",
     "parse:olx": "node parsers/olx.js",
     "parse:zap": "node parsers/zap.js",
     "parse:youtube": "node parsers/youtube.js"

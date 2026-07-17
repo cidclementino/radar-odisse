@@ -56,7 +56,25 @@ const CATS_NAVEGACAO = new Set([
   'newsletter', 'yearbook 2025', 'archive',
 ]);
 
-const REGEX_LINK_COMPETICAO = /^https:\/\/competitions\.archi\/competition\/([^/]+)\/?$/;
+// Resolve um href (relativo ou absoluto, com ou sem query string/hash) e
+// devolve o link canônico de competição, ou `null` se não for um.
+// FIX (pós primeira rodada real): a versão anterior usava um regex rígido
+// que só batia com URL absoluta e sem query string — zerou os itens porque
+// o WordPress provavelmente usa href relativo e/ou params (ex: ?utm_*).
+// `new URL(href, BASE)` resolve os dois casos igual, sem precisar advinhar.
+function resolverLinkCompeticao(href) {
+  if (!href) return null;
+  let url;
+  try {
+    url = new URL(href, BASE);
+  } catch {
+    return null;
+  }
+  if (url.hostname.replace(/^www\./, '') !== 'competitions.archi') return null;
+  const m = url.pathname.match(/^\/competition\/([^/]+)\/?$/);
+  if (!m) return null;
+  return `${BASE}/competition/${m[1]}/`;
+}
 
 const REGEX_BLOCO = /Submission:\s*([^R]+?)\s*Registration:\s*([^L]+?)\s*Location:\s*([^L]+?)\s*Language:\s*([^P]+?)\s*Prizes:\s*([^T]+?)(?:\s*Type:\s*(.+))?$/i;
 
@@ -137,15 +155,19 @@ async function buscarPaginaListagem(categoria, pagina) {
   const html = await res.text();
   const $ = cheerio.load(html);
 
+  // Diagnóstico — fica ligado por padrão (é só uma linha por página, ~4
+  // linhas por rodada) porque foi exatamente a falta dela que deixou a
+  // primeira rodada real (0 itens coletados) sem pista nenhuma do porquê.
+  const anchorsCompeticao = $('a[href]').filter((_, el) => !!resolverLinkCompeticao($(el).attr('href'))).length;
+  const mencoesSubmission = (html.match(/Submission:/gi) || []).length;
+  console.log(`[competitions.archi] debug ${url}: status=${res.status} bytes=${html.length} links_competicao=${anchorsCompeticao} mencoes_submission=${mencoesSubmission}`);
+
   const vistos = new Set(); // um item aparece várias vezes (thumb + título) na mesma listagem
   const itens = [];
 
   $('a[href]').each((_, el) => {
-    const href = $(el).attr('href') || '';
-    const m = href.match(REGEX_LINK_COMPETICAO);
-    if (!m) return;
-
-    const linkCanonico = `${BASE}/competition/${m[1]}/`;
+    const linkCanonico = resolverLinkCompeticao($(el).attr('href'));
+    if (!linkCanonico) return;
     if (vistos.has(linkCanonico)) return;
 
     const $bloco = acharBlocoListagem($, $(el));

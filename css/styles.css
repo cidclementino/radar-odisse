@@ -104,7 +104,7 @@ a { color: inherit; }
 .stage__header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 24px;
   flex-wrap: wrap;
   margin-bottom: 32px;
@@ -119,6 +119,12 @@ a { color: inherit; }
   align-items: flex-end;
   gap: 10px;
   flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .stage__header { flex-direction: column; align-items: flex-start; }
+  .stage__controls { align-items: flex-start; }
+  .filter-group { justify-content: flex-start; }
 }
 
 .filter-group { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
@@ -145,7 +151,15 @@ a { color: inherit; }
 }
 .filter-btn--active:hover { color: var(--ink); background: var(--copper-strong); }
 
-.updated-at { font-size: 0.72rem; color: var(--paper-faint); white-space: nowrap; }
+.updated-at {
+  font-size: 0.72rem;
+  color: var(--paper-dim);
+  white-space: nowrap;
+  padding: 5px 12px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(244, 244, 244, 0.04);
+}
 
 .step__eyebrow {
   font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase;

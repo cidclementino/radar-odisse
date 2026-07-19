@@ -5,12 +5,22 @@
 const DATA_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos';
 const CONCURSO_URL = id => `https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos/${encodeURIComponent(id)}`;
 
-const STATUS_HIDDEN_BY_DEFAULT = new Set(['descartado', 'inscrito']);
-
 const STATUS_LABELS = {
-  descartado: 'Descartado',
+  descartado: 'Arquivado',
   inscrito: 'Inscrito',
 };
+
+// Uma competição é considerada "nova" (tag exibida no card) enquanto o
+// tempo desde a primeira captura for menor que o ciclo de atualização
+// semanal do GitHub Actions — depois disso a tag some sozinha.
+const NOVO_JANELA_MS = 7 * 24 * 60 * 60 * 1000;
+
+function ehNovo(concurso) {
+  if (!concurso.coletado_em) return false;
+  const coletado = new Date(concurso.coletado_em).getTime();
+  if (Number.isNaN(coletado)) return false;
+  return (Date.now() - coletado) < NOVO_JANELA_MS;
+}
 
 const ESCOPO_LABELS = {
   arquitetura: 'Arquitetura',
@@ -111,7 +121,6 @@ function renderDetalhe(concurso) {
         </div>
       </div>
       <div class="concurso__detail-grid">
-        ${campoDetalhe('Nome capturado (original)', concurso.nome)}
         ${campoDetalhe('Promotor', concurso.promotor)}
         ${campoDetalhe('Destinado a', concurso.destinado_a)}
         ${campoDetalhe('Inscrição', custoTexto)}
@@ -122,7 +131,7 @@ function renderDetalhe(concurso) {
       ${link ? `<a class="concurso__detail-link" href="${escapeHTML(link)}" target="_blank" rel="noopener">${linkTexto}</a>` : ''}
       <div class="concurso__actions">
         <button type="button" class="concurso__action-btn concurso__action-btn--descartar" data-action="${descartado ? 'restaurar' : 'descartar'}">
-          ${descartado ? 'Restaurar' : 'Descartar'}
+          ${descartado ? 'Restaurar' : 'Arquivar'}
         </button>
         <button type="button" class="concurso__action-btn concurso__action-btn--apagar" data-action="apagar">
           Apagar
@@ -183,12 +192,15 @@ function renderCard(concurso) {
   const dias = diasAte(concurso.datas?.inscricao_fim);
   const encerrado = estaEncerrado(dias);
   const cor = corPorPrazo(dias, encerrado);
-  const hiddenStatus = STATUS_HIDDEN_BY_DEFAULT.has(concurso.status_interno) || encerrado;
+  const arquivado = concurso.status_interno === 'descartado';
+  const hiddenStatus = arquivado || encerrado;
+  const novo = ehNovo(concurso);
 
   const el = document.createElement('article');
   el.className = `concurso concurso--${cor}${hiddenStatus ? ' concurso--hidden-status' : ''}`;
   el.dataset.status = concurso.status_interno;
   el.dataset.encerrado = String(encerrado);
+  el.dataset.novo = String(novo);
   el.dataset.id = concurso.id;
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
@@ -214,8 +226,11 @@ function renderCard(concurso) {
       ? `<span class="concurso__status-pill">${STATUS_LABELS[concurso.status_interno] || concurso.status_interno}</span>`
       : '';
 
+  const novoBadge = novo ? '<span class="concurso__new-badge">Novo</span>' : '';
+
   el.innerHTML = `
     ${banner}
+    ${novoBadge}
     <div class="concurso__row">
       <div class="concurso__body">
         <div class="concurso__eyebrow">${tags}</div>
@@ -232,8 +247,17 @@ function renderCard(concurso) {
   `;
 
   const alternar = () => {
-    const expandido = el.classList.toggle('is-expanded');
-    el.setAttribute('aria-expanded', String(expandido));
+    const vaiExpandir = !el.classList.contains('is-expanded');
+    if (vaiExpandir) {
+      document.querySelectorAll('.concurso.is-expanded').forEach(outro => {
+        if (outro !== el) {
+          outro.classList.remove('is-expanded');
+          outro.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+    el.classList.toggle('is-expanded', vaiExpandir);
+    el.setAttribute('aria-expanded', String(vaiExpandir));
   };
   el.addEventListener('click', alternar);
   el.addEventListener('keydown', e => {
@@ -245,7 +269,6 @@ function renderCard(concurso) {
 
   // Botões de ação — não podem deixar o clique propagar pro card (senão
   // ele expande/recolhe ao mesmo tempo que a ação roda).
-  const toggle = document.getElementById('toggle-all');
 
   const btnDescartar = el.querySelector('.concurso__action-btn--descartar');
   btnDescartar.addEventListener('click', async e => {
@@ -259,7 +282,7 @@ function renderCard(concurso) {
 
     const idx = concursosState.findIndex(c => c.id === concurso.id);
     if (idx !== -1) concursosState[idx] = atualizado;
-    render(concursosState, toggle.checked);
+    render(concursosState, filtroAtivo);
   });
 
   const btnApagar = el.querySelector('.concurso__action-btn--apagar');
@@ -274,7 +297,7 @@ function renderCard(concurso) {
     if (!ok) return;
 
     concursosState = concursosState.filter(c => c.id !== concurso.id);
-    render(concursosState, toggle.checked);
+    render(concursosState, filtroAtivo);
   });
 
   // Campo de apelido — precisa impedir clique/tecla de propagar pro card
@@ -315,7 +338,44 @@ function renderCard(concurso) {
   return el;
 }
 
-function render(concursos, mostrarTodos) {
+// Filtro ativo da página — "ativos" ("Monitoramento ativo") é o estado
+// padrão: mostra tudo que não foi arquivado (nem encerrado automaticamente
+// pelo prazo). Os outros três recortam esse universo por outro critério.
+let filtroAtivo = 'ativos';
+
+const FILTROS = {
+  novos: c => {
+    const dias = diasAte(c.datas?.inscricao_fim);
+    return ehNovo(c) && c.status_interno !== 'descartado' && !estaEncerrado(dias);
+  },
+  ativos: c => {
+    const dias = diasAte(c.datas?.inscricao_fim);
+    return c.status_interno !== 'descartado' && !estaEncerrado(dias);
+  },
+  arquivados: c => c.status_interno === 'descartado',
+  todos: () => true,
+};
+
+function formatarData(dataISO) {
+  const d = new Date(dataISO);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function renderUpdatedAt(concursos) {
+  const el = document.getElementById('updated-at');
+  if (!el) return;
+  const datas = concursos
+    .map(c => c.coletado_em)
+    .filter(Boolean)
+    .map(d => new Date(d).getTime())
+    .filter(t => !Number.isNaN(t));
+  if (datas.length === 0) { el.textContent = ''; return; }
+  const maisRecente = new Date(Math.max(...datas)).toISOString();
+  el.textContent = `Atualizado em ${formatarData(maisRecente)}`;
+}
+
+function render(concursos, filtro) {
   const stack = document.getElementById('stack');
   const emptyState = document.getElementById('empty-state');
   stack.innerHTML = '';
@@ -331,12 +391,8 @@ function render(concursos, mostrarTodos) {
     return diasA - diasB;
   });
 
-  const visiveis = mostrarTodos
-    ? ordenados
-    : ordenados.filter(c => {
-        const dias = diasAte(c.datas?.inscricao_fim);
-        return !STATUS_HIDDEN_BY_DEFAULT.has(c.status_interno) && !estaEncerrado(dias);
-      });
+  const aplicaFiltro = FILTROS[filtro] || FILTROS.ativos;
+  const visiveis = ordenados.filter(aplicaFiltro);
 
   visiveis.forEach(c => stack.appendChild(renderCard(c)));
 
@@ -344,10 +400,26 @@ function render(concursos, mostrarTodos) {
 
   document.getElementById('footer-count').textContent =
     `${visiveis.length} concurso${visiveis.length === 1 ? '' : 's'} exibido${visiveis.length === 1 ? '' : 's'}`;
+
+  renderUpdatedAt(concursos);
+}
+
+function initFiltros() {
+  const grupo = document.getElementById('filter-group');
+  if (!grupo) return;
+  grupo.addEventListener('click', e => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    filtroAtivo = btn.dataset.filter;
+    grupo.querySelectorAll('.filter-btn').forEach(b => {
+      b.classList.toggle('filter-btn--active', b === btn);
+    });
+    render(concursosState, filtroAtivo);
+  });
 }
 
 async function init() {
-  const toggle = document.getElementById('toggle-all');
+  initFiltros();
 
   try {
     const res = await fetch(DATA_URL);
@@ -357,8 +429,7 @@ async function init() {
     concursosState = [];
   }
 
-  render(concursosState, toggle.checked);
-  toggle.addEventListener('change', () => render(concursosState, toggle.checked));
+  render(concursosState, filtroAtivo);
 }
 
 init();

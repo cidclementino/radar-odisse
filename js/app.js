@@ -352,7 +352,13 @@ const FILTROS = {
     const dias = diasAte(c.datas?.inscricao_fim);
     return c.status_interno !== 'descartado' && !estaEncerrado(dias);
   },
-  arquivados: c => c.status_interno === 'descartado',
+  // "Arquivados" reúne tanto quem foi descartado manualmente quanto quem
+  // saiu do monitoramento ativo sozinho por ter passado do prazo — as duas
+  // formas de um concurso deixar de ser "ativo" (ver texto do estado vazio).
+  arquivados: c => {
+    const dias = diasAte(c.datas?.inscricao_fim);
+    return c.status_interno === 'descartado' || estaEncerrado(dias);
+  },
   todos: () => true,
 };
 

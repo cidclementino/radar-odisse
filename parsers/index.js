@@ -12,4 +12,5 @@
 module.exports = [
   require('./concursosdeprojeto'),
   require('./competitionsarchi'),
+  require('./bustler'),
 ];

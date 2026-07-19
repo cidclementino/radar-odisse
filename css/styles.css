@@ -458,6 +458,25 @@ a { color: inherit; }
 
 .corretor-list { display: flex; flex-direction: column; gap: 10px; }
 
+.load-more-wrap { display: flex; justify-content: center; margin-top: 16px; }
+.load-more-btn {
+  font-family: var(--ui);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--paper-dim);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.load-more-btn:hover {
+  color: var(--copper-strong);
+  border-color: var(--copper-strong);
+  background: rgba(216, 162, 99, 0.08);
+}
+
 .corretor {
   display: grid;
   grid-template-columns: 1fr auto;

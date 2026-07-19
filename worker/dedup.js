@@ -130,17 +130,55 @@ function fundir(existente, candidato) {
 /**
  * Ponto de entrada usado pelo worker: recebe os Concursos já existentes no KV
  * e os candidatos brutos vindos de um parser, retorna a ação a tomar pra cada um.
+ *
+ * DEDUP DENTRO DA MESMA LEVA (fix pós primeira rodada real com bustler.net):
+ * a versão anterior só comparava cada candidato contra `existentes` (o que já
+ * estava no KV *antes* desta coleta começar) — nunca contra os outros
+ * candidatos da própria leva. Isso deixava passar duplicata clássica: o mesmo
+ * concurso syndicado em duas fontes (ex: bustler.net e competitions.archi)
+ * coletado no mesmo cron, nenhum dos dois ainda no KV -> os dois viravam
+ * "novo" ao mesmo tempo, porque nenhum via o outro.
+ *
+ * Fix: mantém um `pool` mutável que começa como cópia de `existentes` e vai
+ * sendo atualizado a cada candidato resolvido nesta leva (fundido ou novo),
+ * pra que o próximo candidato da mesma leva já enxergue o resultado anterior
+ * como se fosse mais um "existente". `origemNoPool` rastreia, pra cada
+ * posição do pool, onde o resultado está guardado (`fundidos[i]` ou
+ * `novos[i]`) — assim, quando um TERCEIRO candidato bate com algo que já foi
+ * fundido/criado nesta mesma leva, ele atualiza o item certo em vez de
+ * duplicar de novo.
  */
 function classificarConcursos(existentes, candidatos) {
   const fundidos = [];
   const novos = [];
   const pendentes_revisao = [];
 
+  const pool = [...existentes];
+  const origemNoPool = new Map(); // índice no pool -> { lista: 'fundidos' | 'novos', index }
+
+  function aplicarResultado(idxPool, itemFundido) {
+    pool[idxPool] = itemFundido;
+    const origem = origemNoPool.get(idxPool);
+    if (!origem) {
+      // Primeira vez que este índice (um `existente` original do KV) é
+      // tocado nesta leva.
+      fundidos.push(itemFundido);
+      origemNoPool.set(idxPool, { lista: 'fundidos', index: fundidos.length - 1 });
+    } else if (origem.lista === 'fundidos') {
+      fundidos[origem.index] = itemFundido;
+    } else {
+      // Era um "novo" criado dentro desta mesma leva — continua "novo" (não
+      // existe no KV ainda), só que agora com os campos das duas fontes
+      // mesclados.
+      novos[origem.index] = itemFundido;
+    }
+  }
+
   for (const candidato of candidatos) {
     // Dedup nível 1 (mesma fonte, mesmo link+título): id já bate exatamente.
-    const igualPorId = existentes.find(e => e.id === candidato.id);
-    if (igualPorId) {
-      fundidos.push(fundir(igualPorId, candidato));
+    const idxIgualPorId = pool.findIndex(e => e.id === candidato.id);
+    if (idxIgualPorId !== -1) {
+      aplicarResultado(idxIgualPorId, fundir(pool[idxIgualPorId], candidato));
       continue;
     }
 
@@ -148,21 +186,21 @@ function classificarConcursos(existentes, candidatos) {
     // Passo 1 — pré-filtro: só considera "candidato a mesmo concurso" quem
     // tiver nome minimamente parecido. Isso evita comparar cada item novo
     // contra concursos totalmente não relacionados.
-    const candidatosPlausiveis = existentes.filter(
-      e => similarity(e.nome, candidato.nome) >= CANDIDATO_THRESHOLD
-    );
+    const candidatosPlausiveis = pool
+      .map((existente, idx) => ({ existente, idx }))
+      .filter(({ existente }) => similarity(existente.nome, candidato.nome) >= CANDIDATO_THRESHOLD);
 
     // Passo 2 — dentro dos plausíveis, aplica a regra bate/ausente/conflito.
     let melhorFusao = null;   // sem conflito algum -> funde
     let melhorRevisao = null; // com conflito, mas ainda plausível -> revisão manual
 
-    for (const existente of candidatosPlausiveis) {
+    for (const { existente, idx } of candidatosPlausiveis) {
       const { temConflito, classificacoes } = comparar(existente, candidato);
       const quantosBatem = Object.values(classificacoes).filter(c => c === 'bate').length;
 
       if (!temConflito) {
         if (!melhorFusao || quantosBatem > melhorFusao.quantosBatem) {
-          melhorFusao = { existente, quantosBatem };
+          melhorFusao = { existente, idx, quantosBatem };
         }
       } else if (!melhorFusao) {
         if (!melhorRevisao || quantosBatem > melhorRevisao.quantosBatem) {
@@ -172,7 +210,7 @@ function classificarConcursos(existentes, candidatos) {
     }
 
     if (melhorFusao) {
-      fundidos.push(fundir(melhorFusao.existente, candidato));
+      aplicarResultado(melhorFusao.idx, fundir(melhorFusao.existente, candidato));
     } else if (melhorRevisao) {
       pendentes_revisao.push({
         candidato_existente: melhorRevisao.existente,
@@ -180,7 +218,9 @@ function classificarConcursos(existentes, candidatos) {
         motivo: melhorRevisao.classificacoes,
       });
     } else {
+      pool.push(candidato);
       novos.push(candidato);
+      origemNoPool.set(pool.length - 1, { lista: 'novos', index: novos.length - 1 });
     }
   }
 

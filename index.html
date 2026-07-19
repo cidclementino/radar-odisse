@@ -17,29 +17,31 @@
       <a class="topbar__nav-link topbar__nav-link--active" href="index.html">Concursos</a>
       <a class="topbar__nav-link" href="terrenos.html">Terrenos</a>
     </nav>
-    <div class="topbar__meta">
-      <label class="switch-row">
-        <span class="switch-row__hint">Mostrar todos</span>
-        <span class="switch">
-          <input type="checkbox" id="toggle-all">
-          <span class="switch__track"></span>
-          <span class="switch__thumb"></span>
-        </span>
-      </label>
-    </div>
+    <div class="topbar__meta"></div>
   </header>
 
   <main class="stage">
     <div class="stage__col">
-      <div class="stage__intro">
-        <p class="step__eyebrow">Radar</p>
-        <h1 class="step__title">Concursos em monitoramento</h1>
-        <p class="step__desc">Atualizado semanalmente via GitHub Actions. Concursos com prazo de inscrição já vencido saem da lista automaticamente.</p>
+      <div class="stage__header">
+        <div class="stage__intro">
+          <p class="step__eyebrow">Radar</p>
+          <h1 class="step__title">Concursos em monitoramento</h1>
+          <p class="step__desc">Atualizado semanalmente via GitHub Actions. Concursos com prazo de inscrição já vencido saem da lista automaticamente.</p>
+        </div>
+        <div class="stage__controls">
+          <div class="filter-group" id="filter-group" role="group" aria-label="Filtrar concursos">
+            <button type="button" class="filter-btn" data-filter="novos">Novos</button>
+            <button type="button" class="filter-btn filter-btn--active" data-filter="ativos">Monitoramento ativo</button>
+            <button type="button" class="filter-btn" data-filter="arquivados">Arquivados</button>
+            <button type="button" class="filter-btn" data-filter="todos">Todos</button>
+          </div>
+          <span class="updated-at" id="updated-at"></span>
+        </div>
       </div>
 
       <div class="stack" id="stack" aria-live="polite"></div>
       <p class="empty-state" id="empty-state" hidden>
-        Nenhum concurso em monitoramento no momento. Ative "Mostrar todos" acima para ver o histórico completo.
+        Nenhum concurso encontrado para esse filtro. Selecione "Todos" acima para ver o histórico completo.
       </p>
     </div>
   </main>

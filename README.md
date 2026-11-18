@@ -48,10 +48,26 @@ node parsers/youtube.js   # precisa de YOUTUBE_API_KEY no ambiente
 npx serve .   # abre index.html (Concursos) ou terrenos.html
 ```
 
-`index.html` lê `data/concursos.sample.json`; `terrenos.html` lê
-`data/oportunidades.sample.json` e `data/corretores.sample.json`. Pra conectar
-no Worker de verdade, troque as URLs em `js/app.js` e `js/terrenos.js` pelos
-endpoints publicados.
+O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os arquivos
+`data/*.sample.json` servem de exemplo do formato dos dados.
+
+## Interface
+
+- **Marca e Universo:** as páginas usam `marca.odisse.com.br/v1/marca.css` (cores, Inter) e
+  `universo.odisse.com.br/base/v1/universo.css` (botões, campos, tabela, etiquetas), com a mesma
+  barra das outras ferramentas internas (selo, logotipo, "Radar", seções e o menu "Universo" de
+  `base/v1/barra.js`). Estilos próprios em `css/styles.css`.
+- **Cartões ou lista:** cada página tem as duas vistas, com os mesmos filtros. A lista é uma tabela
+  ordenável (clique no cabeçalho). Vista, filtros e ordem ficam lembrados no navegador; a busca não.
+  - Concursos: situação, prazo de inscrição (até 15 / 16–45 / mais de 45 dias / sem data), escopo,
+    abrangência, inscrição gratuita ou paga e fonte.
+  - Oportunidades: situação, nível, persona, cidade, fonte e período da coleta.
+  - Corretores: nível, região de atuação, fonte da descoberta e CRECI.
+- **Cache:** os dados ficam guardados no `localStorage` (`radar:dados:*`). A página desenha na hora a
+  cópia guardada e só consulta o Worker se ela tiver mais de 15 minutos (`CACHE_FRESCO_MS`). O botão
+  **Recarregar** força a busca. Arquivar, restaurar, renomear e apagar atualizam a cópia na hora.
+  Além de abrir mais rápido, isso poupa a cota diária de leituras do KV da conta da Cloudflare (cada
+  carregamento lê todas as chaves de um namespace).
 
 ## Publicando o Worker
 

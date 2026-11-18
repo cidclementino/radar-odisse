@@ -1,441 +1,476 @@
-// Radar Odisse — renderização da pilha de concursos
+// Radar Odisse — Concursos
 //
-// Fonte de dados: conectado ao Worker publicado na Cloudflare.
+// Duas vistas sobre os mesmos dados e os mesmos filtros: cartões (com banner) e lista (tabela
+// ordenável). Os dados vêm do Worker com cache no navegador (ver carregarComCache em comum.js).
 
-const DATA_URL = 'https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos';
-const CONCURSO_URL = id => `https://radar-odisse.reservaprojectbasework.workers.dev/api/concursos/${encodeURIComponent(id)}`;
+const DATA_URL = `${WORKER}/api/concursos`;
+const CONCURSO_URL = id => `${WORKER}/api/concursos/${encodeURIComponent(id)}`;
+const CACHE_CHAVE = 'concursos';
 
-const STATUS_LABELS = {
-  descartado: 'Arquivado',
-  inscrito: 'Inscrito',
-};
-
-// Uma competição é considerada "nova" (tag exibida no card) enquanto o
-// tempo desde a primeira captura for menor que o ciclo de atualização
-// semanal do GitHub Actions — depois disso a tag some sozinha.
-const NOVO_JANELA_MS = 7 * 24 * 60 * 60 * 1000;
-
-function ehNovo(concurso) {
-  if (!concurso.coletado_em) return false;
-  const coletado = new Date(concurso.coletado_em).getTime();
-  if (Number.isNaN(coletado)) return false;
-  return (Date.now() - coletado) < NOVO_JANELA_MS;
-}
+const STATUS_LABELS = { monitorando: 'Monitorando', descartado: 'Arquivado', inscrito: 'Inscrito' };
 
 const ESCOPO_LABELS = {
   arquitetura: 'Arquitetura',
   urbanismo: 'Urbanismo',
   paisagismo: 'Paisagismo',
-  design_produto_mobiliario: 'Design de Produto',
+  design_produto_mobiliario: 'Design de produto',
 };
 
-// Estado local dos concursos carregados — atualizado in-place quando o
-// usuário descarta/restaura/apaga um card, pra não precisar recarregar a
-// lista inteira do Worker a cada ação.
+// Um concurso é "novo" enquanto a primeira captura tiver menos de uma semana (o ciclo da coleta
+// semanal) — depois disso a etiqueta some sozinha.
+const NOVO_JANELA_MS = 7 * 24 * 60 * 60 * 1000;
+
 let concursosState = [];
 
-function diasAte(dataISO) {
-  if (!dataISO) return null;
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const alvo = new Date(dataISO + 'T00:00:00');
-  return Math.round((alvo - hoje) / (1000 * 60 * 60 * 24));
+// ---------------------------------------------------------------- regras
+
+function ehNovo(c) {
+  if (!c.coletado_em) return false;
+  const t = new Date(c.coletado_em).getTime();
+  return !Number.isNaN(t) && Date.now() - t < NOVO_JANELA_MS;
 }
 
-// Um concurso é considerado "encerrado" automaticamente quando o prazo de
-// inscrição já passou, independente do status_interno ter sido atualizado
-// manualmente ou não.
-function estaEncerrado(dias) {
-  return dias !== null && dias < 0;
+// Encerrado = o prazo de inscrição já passou, mesmo que ninguém tenha arquivado.
+function estaEncerrado(dias) { return dias !== null && dias < 0; }
+
+function urgencia(dias, encerrado) {
+  if (encerrado || dias === null || dias === undefined) return 'neutro';
+  if (dias <= 15) return 'alta';
+  if (dias <= 45) return 'media';
+  return 'baixa';
 }
 
-function corPorPrazo(dias, encerrado) {
-  if (encerrado) return 'gray';
-  if (dias === null || dias === undefined) return 'gray';
-  if (dias <= 15) return 'red';
-  if (dias <= 45) return 'orange';
-  return 'green';
-}
-
-// Label estático — o número já está grande ao lado, não repete a contagem aqui.
 function textoPrazo(dias, encerrado) {
   if (encerrado) return 'Inscrições encerradas';
   if (dias === null || dias === undefined) return 'Prazo de inscrição não informado';
-  return 'dias para o fim das inscrições';
+  return dias === 1 ? 'dia para o fim das inscrições' : 'dias para o fim das inscrições';
 }
 
-function escapeHTML(str) {
-  const div = document.createElement('div');
-  div.textContent = str ?? '';
-  return div.innerHTML;
+function inscricaoTexto(c) {
+  if (c.inscricao?.gratuita === true) return 'Gratuita' + (c.inscricao?.obs ? ` — ${c.inscricao.obs}` : '');
+  return c.inscricao?.custo || null;
 }
 
-// escapeHTML (via textContent->innerHTML) NÃO escapa aspas — correto pra texto
-// solto, mas quebra se usado dentro de um atributo tipo value="...". Usado
-// especificamente no <input> de apelido, que é o primeiro lugar do código
-// que injeta valor dinâmico dentro de um atributo HTML (não só como texto).
-function escapeAttr(str) {
-  return escapeHTML(str).replace(/"/g, '&quot;');
+function inscricaoTipo(c) {
+  if (c.inscricao?.gratuita === true) return 'gratuita';
+  if (c.inscricao?.gratuita === false || c.inscricao?.custo) return 'paga';
+  return null;
 }
 
-function campoDetalhe(label, valor) {
-  if (valor === null || valor === undefined || valor === '') return '';
-  return `
-    <div class="concurso__detail-item">
-      <div class="concurso__detail-label">${escapeHTML(label)}</div>
-      <div class="concurso__detail-value">${escapeHTML(valor)}</div>
-    </div>
-  `;
+const nomeExibido = c => c.apelido || c.nome;
+const fontesDe = c => (c.fontes && c.fontes.length ? c.fontes : [c.fonte].filter(Boolean));
+
+// ---------------------------------------------------------------- filtros
+
+const FILTROS_PADRAO = { busca: '', situacao: 'ativos', prazo: '', escopo: '', tipo: '', inscricao: '', fonte: '' };
+let filtros = { ...FILTROS_PADRAO, ...prefLer('concursos:filtros', {}) };
+filtros.busca = ''; // a busca não fica lembrada entre visitas
+
+const SITUACOES = {
+  novos: c => ehNovo(c) && c.status_interno !== 'descartado' && !estaEncerrado(diasAte(c.datas?.inscricao_fim)),
+  ativos: c => c.status_interno !== 'descartado' && !estaEncerrado(diasAte(c.datas?.inscricao_fim)),
+  // "Arquivados" reúne quem foi arquivado à mão e quem passou do prazo de inscrição.
+  arquivados: c => c.status_interno === 'descartado' || estaEncerrado(diasAte(c.datas?.inscricao_fim)),
+  todos: () => true,
+};
+
+function passaFiltros(c) {
+  if (!(SITUACOES[filtros.situacao] || SITUACOES.ativos)(c)) return false;
+
+  if (filtros.busca) {
+    const alvo = normalizar([c.apelido, c.nome, c.promotor, c.local_projeto].join(' '));
+    if (!normalizar(filtros.busca).split(/\s+/).filter(Boolean).every(t => alvo.includes(t))) return false;
+  }
+
+  if (filtros.prazo) {
+    const d = diasAte(c.datas?.inscricao_fim);
+    const aberto = d !== null && d >= 0;
+    if (filtros.prazo === '15' && !(aberto && d <= 15)) return false;
+    if (filtros.prazo === '45' && !(aberto && d > 15 && d <= 45)) return false;
+    if (filtros.prazo === 'mais' && !(aberto && d > 45)) return false;
+    if (filtros.prazo === 'sem' && d !== null) return false;
+  }
+
+  if (filtros.escopo && !(c.escopo || []).includes(filtros.escopo)) return false;
+  if (filtros.tipo && c.tipo !== filtros.tipo) return false;
+  if (filtros.inscricao && inscricaoTipo(c) !== filtros.inscricao) return false;
+  if (filtros.fonte && !fontesDe(c).includes(filtros.fonte)) return false;
+  return true;
 }
 
-function renderDetalhe(concurso) {
-  const link = concurso.link_oficial || concurso.fonte_url_original;
-  const linkTexto = concurso.link_oficial ? 'Abrir site oficial ↗' : 'Ver publicação original ↗';
-
-  const custoTexto = concurso.inscricao?.gratuita === true
-    ? 'Gratuita' + (concurso.inscricao?.obs ? ` — ${concurso.inscricao.obs}` : '')
-    : concurso.inscricao?.custo || null;
-
-  const bancaTexto = concurso.banca_definida === true
-    ? (concurso.banca_obs || 'Definida')
-    : concurso.banca_definida === false
-      ? 'Ainda não definida'
-      : null;
-
-  const descartado = concurso.status_interno === 'descartado';
-  const apelidoAtual = concurso.apelido || concurso.nome;
-
-  return `
-    <div class="concurso__detail">
-      <div class="concurso__apelido">
-        <label class="concurso__detail-label" for="apelido-${escapeHTML(concurso.id)}">Apelido de exibição</label>
-        <div class="concurso__apelido-row">
-          <input
-            type="text"
-            id="apelido-${escapeHTML(concurso.id)}"
-            class="concurso__apelido-input"
-            value="${escapeAttr(apelidoAtual)}"
-            maxlength="200"
-          />
-          <button type="button" class="concurso__action-btn concurso__apelido-salvar">Salvar</button>
-        </div>
-      </div>
-      <div class="concurso__detail-grid">
-        ${campoDetalhe('Promotor', concurso.promotor)}
-        ${campoDetalhe('Destinado a', concurso.destinado_a)}
-        ${campoDetalhe('Inscrição', custoTexto)}
-        ${campoDetalhe('Prêmio', concurso.premio)}
-        ${campoDetalhe('Banca julgadora', bancaTexto)}
-        ${campoDetalhe('Entrega do projeto', concurso.datas?.entrega_fim)}
-      </div>
-      ${link ? `<a class="concurso__detail-link" href="${escapeHTML(link)}" target="_blank" rel="noopener">${linkTexto}</a>` : ''}
-      <div class="concurso__actions">
-        <button type="button" class="concurso__action-btn concurso__action-btn--descartar" data-action="${descartado ? 'restaurar' : 'descartar'}">
-          ${descartado ? 'Restaurar' : 'Arquivar'}
-        </button>
-        <button type="button" class="concurso__action-btn concurso__action-btn--apagar" data-action="apagar">
-          Apagar
-        </button>
-      </div>
-    </div>
-  `;
+function filtrosAtivos() {
+  return Object.keys(FILTROS_PADRAO).some(k => filtros[k] !== FILTROS_PADRAO[k]);
 }
 
-/** Chama o Worker pra mudar status_interno (descartar/restaurar). Retorna o item atualizado ou null se falhar. */
-async function atualizarStatus(id, status_interno) {
+function ligarFiltros() {
+  const campos = {
+    busca: 'f-busca', situacao: 'f-situacao', prazo: 'f-prazo', escopo: 'f-escopo',
+    tipo: 'f-tipo', inscricao: 'f-inscricao', fonte: 'f-fonte',
+  };
+  for (const [k, id] of Object.entries(campos)) {
+    const el = document.getElementById(id);
+    el.value = filtros[k];
+    el.addEventListener(k === 'busca' ? 'input' : 'change', () => {
+      filtros[k] = el.value;
+      const { busca, ...lembrar } = filtros;
+      prefGravar('concursos:filtros', lembrar);
+      render();
+    });
+  }
+  document.getElementById('f-limpar').addEventListener('click', () => {
+    filtros = { ...FILTROS_PADRAO };
+    prefGravar('concursos:filtros', {});
+    for (const [k, id] of Object.entries(campos)) document.getElementById(id).value = filtros[k];
+    render();
+  });
+}
+
+// As opções de escopo e fonte saem dos próprios dados (uma fonte nova aparece sozinha).
+function atualizarOpcoesFiltros() {
+  const escopos = [...new Set(concursosState.flatMap(c => c.escopo || []))];
+  preencherSelect(document.getElementById('f-escopo'),
+    escopos.map(e => [e, ESCOPO_LABELS[e] || e]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')), 'Todos os escopos');
+  const fontes = [...new Set(concursosState.flatMap(fontesDe))].sort();
+  preencherSelect(document.getElementById('f-fonte'), fontes.map(f => [f, f]), 'Todas as fontes');
+  document.getElementById('f-escopo').value = escopos.includes(filtros.escopo) ? filtros.escopo : '';
+  document.getElementById('f-fonte').value = fontes.includes(filtros.fonte) ? filtros.fonte : '';
+}
+
+// ---------------------------------------------------------------- Worker
+
+async function patchConcurso(id, corpo, erro) {
   try {
     const res = await fetch(CONCURSO_URL(id), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status_interno }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
     });
     if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.error('Falha ao atualizar status do concurso:', err);
-    alert('Não foi possível atualizar esse concurso agora. Tenta de novo em instantes.');
+    console.error(err);
+    alert(erro);
     return null;
   }
 }
 
-/** Chama o Worker pra mudar o apelido de exibição. Retorna o item atualizado ou null se falhar. */
-async function atualizarApelido(id, apelido) {
-  try {
-    const res = await fetch(CONCURSO_URL(id), {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apelido }),
-    });
-    if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('Falha ao atualizar apelido do concurso:', err);
-    alert('Não foi possível salvar o apelido agora. Tenta de novo em instantes.');
-    return null;
-  }
-}
-
-/** Chama o Worker pra apagar definitivamente. Retorna true se deu certo. */
 async function apagarConcurso(id) {
   try {
     const res = await fetch(CONCURSO_URL(id), { method: 'DELETE' });
     if (!res.ok) throw new Error(`Worker retornou ${res.status}`);
     return true;
   } catch (err) {
-    console.error('Falha ao apagar concurso:', err);
-    alert('Não foi possível apagar esse concurso agora. Tenta de novo em instantes.');
+    console.error(err);
+    alert('Não foi possível apagar esse concurso agora. Tente de novo em instantes.');
     return false;
   }
 }
 
-function renderCard(concurso) {
-  const dias = diasAte(concurso.datas?.inscricao_fim);
+// Toda mudança feita na tela vai para o estado e para o cache, para não exigir nova busca.
+function substituir(atualizado) {
+  const i = concursosState.findIndex(c => c.id === atualizado.id);
+  if (i !== -1) concursosState[i] = atualizado;
+  cacheGravar(CACHE_CHAVE, concursosState);
+}
+
+function remover(id) {
+  concursosState = concursosState.filter(c => c.id !== id);
+  cacheGravar(CACHE_CHAVE, concursosState);
+}
+
+// ---------------------------------------------------------------- detalhe (comum às duas vistas)
+
+function campoDetalhe(rotulo, valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  return `<div class="detalhe__item"><div class="u-rotulo">${escapeHTML(rotulo)}</div><div>${escapeHTML(valor)}</div></div>`;
+}
+
+function renderDetalhe(c) {
+  const link = c.link_oficial || c.fonte_url_original;
+  const linkTexto = c.link_oficial ? 'Abrir site oficial ↗' : 'Ver publicação original ↗';
+  const banca = c.banca_definida === true ? (c.banca_obs || 'Definida') : c.banca_definida === false ? 'Ainda não definida' : null;
+  const arquivado = c.status_interno === 'descartado';
+
+  return `
+    <div class="detalhe">
+      <label class="u-campo detalhe__apelido">
+        <span>Apelido de exibição</span>
+        <div class="detalhe__apelido-linha">
+          <input type="text" class="js-apelido" value="${escapeHTML(nomeExibido(c))}" maxlength="200">
+          <button type="button" class="u-botao js-salvar-apelido">Salvar</button>
+        </div>
+        ${c.apelido ? `<small>Nome capturado: ${escapeHTML(c.nome)}</small>` : ''}
+      </label>
+      <div class="detalhe__grade">
+        ${campoDetalhe('Promotor', c.promotor)}
+        ${campoDetalhe('Destinado a', c.destinado_a)}
+        ${campoDetalhe('Inscrição', inscricaoTexto(c))}
+        ${campoDetalhe('Prêmio', c.premio)}
+        ${campoDetalhe('Banca julgadora', banca)}
+        ${campoDetalhe('Fim das inscrições', formatarData(c.datas?.inscricao_fim))}
+        ${campoDetalhe('Entrega do projeto', formatarData(c.datas?.entrega_fim))}
+        ${campoDetalhe('Fontes', fontesDe(c).join(', '))}
+      </div>
+      ${link ? `<a class="detalhe__link" href="${escapeHTML(link)}" target="_blank" rel="noopener">${linkTexto}</a>` : ''}
+      <div class="detalhe__acoes">
+        <button type="button" class="u-botao js-arquivar">${arquivado ? 'Restaurar' : 'Arquivar'}</button>
+        <button type="button" class="u-botao perigo js-apagar">Apagar</button>
+      </div>
+    </div>`;
+}
+
+/** liga os botões do painel de detalhe; nenhum clique ali dentro abre/fecha o item */
+function ligarDetalhe(raiz, c) {
+  const painel = raiz.querySelector('.detalhe');
+  painel.addEventListener('click', e => e.stopPropagation());
+  painel.addEventListener('keydown', e => e.stopPropagation());
+
+  const input = painel.querySelector('.js-apelido');
+  const salvar = painel.querySelector('.js-salvar-apelido');
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); salvar.click(); } });
+  salvar.addEventListener('click', async () => {
+    const apelido = input.value.trim();
+    if (!apelido) { alert('O apelido não pode ficar vazio. Para voltar ao nome capturado, cole ele aqui.'); return; }
+    salvar.disabled = true;
+    const atualizado = await patchConcurso(c.id, { apelido }, 'Não foi possível salvar o apelido agora. Tente de novo em instantes.');
+    salvar.disabled = false;
+    if (!atualizado) return;
+    substituir(atualizado);
+    // renomear não muda ordem nem visibilidade: atualiza só o nome, sem fechar o painel
+    raiz.querySelectorAll('.js-nome').forEach(el => { el.textContent = nomeExibido(atualizado); });
+    if (raiz.previousElementSibling?.matches('tr.linha')) {
+      raiz.previousElementSibling.querySelector('.js-nome').textContent = nomeExibido(atualizado);
+    }
+  });
+
+  const arquivar = painel.querySelector('.js-arquivar');
+  arquivar.addEventListener('click', async () => {
+    const novo = c.status_interno === 'descartado' ? 'monitorando' : 'descartado';
+    arquivar.disabled = true;
+    const atualizado = await patchConcurso(c.id, { status_interno: novo }, 'Não foi possível atualizar esse concurso agora. Tente de novo em instantes.');
+    arquivar.disabled = false;
+    if (!atualizado) return;
+    substituir(atualizado);
+    render();
+  });
+
+  const apagar = painel.querySelector('.js-apagar');
+  apagar.addEventListener('click', async () => {
+    if (!confirm(`Apagar definitivamente "${nomeExibido(c)}"? Essa ação não pode ser desfeita.`)) return;
+    apagar.disabled = true;
+    const ok = await apagarConcurso(c.id);
+    apagar.disabled = false;
+    if (!ok) return;
+    remover(c.id);
+    render();
+  });
+}
+
+// O item aberto continua aberto quando a tela é redesenhada (ex.: depois de mudar um filtro).
+let abertoId = null;
+
+// ---------------------------------------------------------------- vista: cartões
+
+function renderCard(c) {
+  const dias = diasAte(c.datas?.inscricao_fim);
   const encerrado = estaEncerrado(dias);
-  const cor = corPorPrazo(dias, encerrado);
-  const arquivado = concurso.status_interno === 'descartado';
-  const hiddenStatus = arquivado || encerrado;
-  const novo = ehNovo(concurso);
+  const arquivado = c.status_interno === 'descartado';
 
   const el = document.createElement('article');
-  el.className = `concurso concurso--${cor}${hiddenStatus ? ' concurso--hidden-status' : ''}`;
-  el.dataset.status = concurso.status_interno;
-  el.dataset.encerrado = String(encerrado);
-  el.dataset.novo = String(novo);
-  el.dataset.id = concurso.id;
+  el.className = `concurso concurso--${urgencia(dias, encerrado)}${arquivado || encerrado ? ' is-apagado' : ''}`;
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
-  el.setAttribute('aria-expanded', 'false');
 
-  // FIX (performance + escape que faltava): a versão anterior usava
-  // background-image inline sem escapar a URL (risco de quebrar o atributo
-  // se a URL tiver aspas) e o navegador baixava TODAS as imagens assim que
-  // o card era criado, mesmo fora da tela. `<img loading="lazy">` resolve os
-  // dois: escapa via escapeAttr, e só baixa quando o card está perto de
-  // entrar na viewport (suporte nativo do navegador, sem JS extra).
-  const banner = concurso.imagem_url
-    ? `<img class="concurso__banner" src="${escapeAttr(concurso.imagem_url)}" alt="" loading="lazy" decoding="async" />`
-    : `<div class="concurso__banner"></div>`;
-
-  const tags = (concurso.escopo || [])
-    .map(e => `<span class="tag">${escapeHTML(ESCOPO_LABELS[e] || e)}</span>`)
-    .join('');
-
-  const statusPill = encerrado
-    ? '<span class="concurso__status-pill">Encerrado</span>'
-    : concurso.status_interno !== 'monitorando'
-      ? `<span class="concurso__status-pill">${STATUS_LABELS[concurso.status_interno] || concurso.status_interno}</span>`
-      : '';
-
-  const novoBadge = novo ? '<span class="concurso__new-badge">Novo</span>' : '';
+  const banner = c.imagem_url
+    ? `<img class="concurso__banner" src="${escapeHTML(c.imagem_url)}" alt="" loading="lazy" decoding="async">`
+    : '<div class="concurso__banner"></div>';
+  const tags = (c.escopo || []).map(e => `<span class="u-etiqueta suave">${escapeHTML(ESCOPO_LABELS[e] || e)}</span>`).join('');
+  const situacao = encerrado ? 'Encerrado' : c.status_interno !== 'monitorando' ? (STATUS_LABELS[c.status_interno] || c.status_interno) : '';
 
   el.innerHTML = `
     ${banner}
-    ${novoBadge}
-    <div class="concurso__row">
-      <div class="concurso__body">
-        <div class="concurso__eyebrow">${tags}</div>
-        <h2 class="concurso__title"><span class="concurso__title-text">${escapeHTML(concurso.apelido || concurso.nome)}</span></h2>
-        <p class="concurso__place">${escapeHTML(concurso.local_projeto)}</p>
-      </div>
-      <div class="concurso__footer">
-        <span class="concurso__deadline-count tabular">${!encerrado && dias !== null ? dias : '—'}</span>
-        <span class="concurso__deadline-label">${textoPrazo(dias, encerrado)}</span>
-      </div>
+    <div class="concurso__selos">
+      ${ehNovo(c) ? '<span class="u-etiqueta selo-novo">Novo</span>' : '<span></span>'}
+      ${situacao ? `<span class="u-etiqueta">${escapeHTML(situacao)}</span>` : ''}
     </div>
-    ${statusPill}
-    ${renderDetalhe(concurso)}
-  `;
+    <div class="concurso__corpo">
+      <div class="concurso__tags">${tags}</div>
+      <h2 class="concurso__titulo js-nome">${escapeHTML(nomeExibido(c))}</h2>
+      <p class="concurso__local">${escapeHTML(c.local_projeto || '')}</p>
+    </div>
+    <div class="concurso__prazo">
+      <span class="concurso__dias">${!encerrado && dias !== null ? dias : '—'}</span>
+      <span class="concurso__prazo-texto">${textoPrazo(dias, encerrado)}${!encerrado && dias !== null ? ` · ${formatarData(c.datas.inscricao_fim, { curta: true })}` : ''}</span>
+    </div>
+    ${renderDetalhe(c)}`;
 
   const alternar = () => {
-    const vaiExpandir = !el.classList.contains('is-expanded');
-    if (vaiExpandir) {
-      document.querySelectorAll('.concurso.is-expanded').forEach(outro => {
-        if (outro !== el) {
-          outro.classList.remove('is-expanded');
-          outro.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
-    el.classList.toggle('is-expanded', vaiExpandir);
-    el.setAttribute('aria-expanded', String(vaiExpandir));
+    const abrir = !el.classList.contains('is-aberto');
+    document.querySelectorAll('.concurso.is-aberto').forEach(o => o.classList.remove('is-aberto'));
+    el.classList.toggle('is-aberto', abrir);
+    el.setAttribute('aria-expanded', String(abrir));
+    abertoId = abrir ? c.id : null;
   };
+  el.setAttribute('aria-expanded', 'false');
+  if (abertoId === c.id) { el.classList.add('is-aberto'); el.setAttribute('aria-expanded', 'true'); }
   el.addEventListener('click', alternar);
-  el.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); }
-  });
-
-  const linkDetalhe = el.querySelector('.concurso__detail-link');
-  if (linkDetalhe) linkDetalhe.addEventListener('click', e => e.stopPropagation());
-
-  // Botões de ação — não podem deixar o clique propagar pro card (senão
-  // ele expande/recolhe ao mesmo tempo que a ação roda).
-
-  const btnDescartar = el.querySelector('.concurso__action-btn--descartar');
-  btnDescartar.addEventListener('click', async e => {
-    e.stopPropagation();
-    const acao = btnDescartar.dataset.action; // 'descartar' ou 'restaurar'
-    const novoStatus = acao === 'descartar' ? 'descartado' : 'monitorando';
-    btnDescartar.disabled = true;
-    const atualizado = await atualizarStatus(concurso.id, novoStatus);
-    btnDescartar.disabled = false;
-    if (!atualizado) return;
-
-    const idx = concursosState.findIndex(c => c.id === concurso.id);
-    if (idx !== -1) concursosState[idx] = atualizado;
-    render(concursosState, filtroAtivo);
-  });
-
-  const btnApagar = el.querySelector('.concurso__action-btn--apagar');
-  btnApagar.addEventListener('click', async e => {
-    e.stopPropagation();
-    const confirmado = confirm(`Apagar definitivamente "${concurso.nome}"? Essa ação não pode ser desfeita.`);
-    if (!confirmado) return;
-
-    btnApagar.disabled = true;
-    const ok = await apagarConcurso(concurso.id);
-    btnApagar.disabled = false;
-    if (!ok) return;
-
-    concursosState = concursosState.filter(c => c.id !== concurso.id);
-    render(concursosState, filtroAtivo);
-  });
-
-  // Campo de apelido — precisa impedir clique/tecla de propagar pro card
-  // (senão digitar ou clicar no input expande/recolhe o painel sem querer).
-  const inputApelido = el.querySelector('.concurso__apelido-input');
-  const btnSalvarApelido = el.querySelector('.concurso__apelido-salvar');
-  const tituloEl = el.querySelector('.concurso__title-text');
-
-  inputApelido.addEventListener('click', e => e.stopPropagation());
-  inputApelido.addEventListener('keydown', e => {
-    e.stopPropagation();
-    if (e.key === 'Enter') { e.preventDefault(); btnSalvarApelido.click(); }
-  });
-
-  btnSalvarApelido.addEventListener('click', async e => {
-    e.stopPropagation();
-    const novoApelido = inputApelido.value.trim();
-    if (!novoApelido) {
-      alert('O apelido não pode ficar vazio — se quiser voltar ao nome capturado, cole ele aqui.');
-      return;
-    }
-
-    btnSalvarApelido.disabled = true;
-    const atualizado = await atualizarApelido(concurso.id, novoApelido);
-    btnSalvarApelido.disabled = false;
-    if (!atualizado) return;
-
-    const idx = concursosState.findIndex(c => c.id === concurso.id);
-    if (idx !== -1) concursosState[idx] = atualizado;
-
-    // Atualiza só o título na tela, sem chamar render() inteiro — diferente
-    // de descartar/apagar, renomear não muda ordenação nem visibilidade do
-    // card, então não há motivo pra recolher o painel que o usuário acabou
-    // de usar.
-    tituloEl.textContent = atualizado.apelido || atualizado.nome;
-  });
-
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+  // imagem que não carrega vira o mesmo fundo neutro dos concursos sem banner
+  el.querySelector('img.concurso__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
+  ligarDetalhe(el, c);
   return el;
 }
 
-// Filtro ativo da página — "ativos" ("Monitoramento ativo") é o estado
-// padrão: mostra tudo que não foi arquivado (nem encerrado automaticamente
-// pelo prazo). Os outros três recortam esse universo por outro critério.
-let filtroAtivo = 'ativos';
+// ---------------------------------------------------------------- vista: lista
 
-const FILTROS = {
-  novos: c => {
-    const dias = diasAte(c.datas?.inscricao_fim);
-    return ehNovo(c) && c.status_interno !== 'descartado' && !estaEncerrado(dias);
-  },
-  ativos: c => {
-    const dias = diasAte(c.datas?.inscricao_fim);
-    return c.status_interno !== 'descartado' && !estaEncerrado(dias);
-  },
-  // "Arquivados" reúne tanto quem foi descartado manualmente quanto quem
-  // saiu do monitoramento ativo sozinho por ter passado do prazo — as duas
-  // formas de um concurso deixar de ser "ativo" (ver texto do estado vazio).
-  arquivados: c => {
-    const dias = diasAte(c.datas?.inscricao_fim);
-    return c.status_interno === 'descartado' || estaEncerrado(dias);
-  },
-  todos: () => true,
+const COLUNAS = [
+  { id: 'nome', rotulo: 'Concurso' },
+  { id: 'local', rotulo: 'Local' },
+  { id: 'escopo', rotulo: 'Escopo', classe: 'col-media' },
+  { id: 'tipo', rotulo: 'Abrangência', classe: 'col-media' },
+  { id: 'inscricao_fim', rotulo: 'Inscrições até', classe: 'col-num' },
+  { id: 'dias', rotulo: 'Dias', classe: 'col-num' },
+  { id: 'entrega_fim', rotulo: 'Entrega', classe: 'col-num col-larga' },
+  { id: 'inscricao', rotulo: 'Inscrição', classe: 'col-larga' },
+  { id: 'situacao', rotulo: 'Situação', classe: 'col-media' },
+];
+
+let ordem = prefLer('concursos:ordem', { coluna: 'dias', direcao: 'asc' });
+
+const VALOR_ORDEM = {
+  nome: c => normalizar(nomeExibido(c)),
+  local: c => normalizar(c.local_projeto),
+  escopo: c => (c.escopo || []).map(e => ESCOPO_LABELS[e] || e).join(', '),
+  tipo: c => c.tipo,
+  inscricao_fim: c => c.datas?.inscricao_fim || null,
+  dias: c => { const d = diasAte(c.datas?.inscricao_fim); return d === null || d < 0 ? null : d; },
+  entrega_fim: c => c.datas?.entrega_fim || null,
+  inscricao: c => inscricaoTipo(c),
+  situacao: c => situacaoTexto(c),
 };
 
-function formatarData(dataISO) {
-  const d = new Date(dataISO);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function situacaoTexto(c) {
+  if (estaEncerrado(diasAte(c.datas?.inscricao_fim))) return 'Encerrado';
+  return STATUS_LABELS[c.status_interno] || c.status_interno;
 }
 
-function renderUpdatedAt(concursos) {
-  const el = document.getElementById('updated-at');
-  if (!el) return;
-  const datas = concursos
-    .map(c => c.coletado_em)
-    .filter(Boolean)
-    .map(d => new Date(d).getTime())
-    .filter(t => !Number.isNaN(t));
-  if (datas.length === 0) { el.textContent = ''; return; }
-  const maisRecente = new Date(Math.max(...datas)).toISOString();
-  el.textContent = `Atualizado em ${formatarData(maisRecente)}`;
-}
+function renderLista(itens) {
+  const lista = document.getElementById('lista');
+  const f = VALOR_ORDEM[ordem.coluna] || VALOR_ORDEM.dias;
+  const ordenados = [...itens].sort((a, b) => comparar(f(a), f(b), ordem.direcao) || comparar(VALOR_ORDEM.dias(a), VALOR_ORDEM.dias(b), 'asc'));
 
-function render(concursos, filtro) {
-  const stack = document.getElementById('stack');
-  const emptyState = document.getElementById('empty-state');
-  stack.innerHTML = '';
+  lista.innerHTML = `<div class="tabela-rolagem"><table class="u-tabela tabela">${theadOrdenavel(COLUNAS, ordem)}<tbody></tbody></table></div>`;
+  const tbody = lista.querySelector('tbody');
 
-  // Ordena por proximidade do prazo de inscrição (mais urgente primeiro).
-  // Concursos sem data informada ficam por último, entre os visíveis.
-  const ordenados = [...concursos].sort((a, b) => {
-    const diasA = diasAte(a.datas?.inscricao_fim);
-    const diasB = diasAte(b.datas?.inscricao_fim);
-    if (diasA === null && diasB === null) return 0;
-    if (diasA === null) return 1;
-    if (diasB === null) return -1;
-    return diasA - diasB;
-  });
+  for (const c of ordenados) {
+    const dias = diasAte(c.datas?.inscricao_fim);
+    const encerrado = estaEncerrado(dias);
+    const tr = document.createElement('tr');
+    tr.className = `linha linha--${urgencia(dias, encerrado)}${c.status_interno === 'descartado' || encerrado ? ' is-apagado' : ''}`;
+    tr.tabIndex = 0;
+    tr.innerHTML = `
+      <td><div class="linha__titulo"><span class="js-nome">${escapeHTML(nomeExibido(c))}</span>${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
+        ${c.promotor ? `<div class="u-apoio">${escapeHTML(c.promotor)}</div>` : ''}</td>
+      <td>${escapeHTML(c.local_projeto || '')}</td>
+      <td class="col-media">${escapeHTML((c.escopo || []).map(e => ESCOPO_LABELS[e] || e).join(', '))}</td>
+      <td class="col-media">${c.tipo === 'nacional' ? 'Nacional' : c.tipo === 'internacional' ? 'Internacional' : ''}</td>
+      <td class="col-num">${formatarData(c.datas?.inscricao_fim) || '<span class="u-apoio">—</span>'}</td>
+      <td class="col-num"><span class="dias">${!encerrado && dias !== null ? dias : '—'}</span></td>
+      <td class="col-num col-larga">${formatarData(c.datas?.entrega_fim) || '<span class="u-apoio">—</span>'}</td>
+      <td class="col-larga">${escapeHTML(inscricaoTexto(c) || '')}</td>
+      <td class="col-media">${escapeHTML(situacaoTexto(c))}</td>`;
 
-  const aplicaFiltro = FILTROS[filtro] || FILTROS.ativos;
-  const visiveis = ordenados.filter(aplicaFiltro);
+    const det = document.createElement('tr');
+    det.className = 'linha-detalhe';
+    det.hidden = abertoId !== c.id;
+    det.innerHTML = `<td colspan="${COLUNAS.length}">${renderDetalhe(c)}</td>`;
+    tr.classList.toggle('is-aberto', abertoId === c.id);
 
-  visiveis.forEach(c => stack.appendChild(renderCard(c)));
-
-  emptyState.hidden = visiveis.length > 0;
-
-  document.getElementById('footer-count').textContent =
-    `${visiveis.length} concurso${visiveis.length === 1 ? '' : 's'} exibido${visiveis.length === 1 ? '' : 's'}`;
-
-  renderUpdatedAt(concursos);
-}
-
-function initFiltros() {
-  const grupo = document.getElementById('filter-group');
-  if (!grupo) return;
-  grupo.addEventListener('click', e => {
-    const btn = e.target.closest('.filter-btn');
-    if (!btn) return;
-    filtroAtivo = btn.dataset.filter;
-    grupo.querySelectorAll('.filter-btn').forEach(b => {
-      b.classList.toggle('filter-btn--active', b === btn);
-    });
-    render(concursosState, filtroAtivo);
-  });
-}
-
-async function init() {
-  initFiltros();
-
-  try {
-    const res = await fetch(DATA_URL);
-    concursosState = await res.json();
-  } catch (err) {
-    console.error('Falha ao carregar dados do Radar:', err);
-    concursosState = [];
+    const alternar = () => {
+      const abrir = det.hidden;
+      tbody.querySelectorAll('.linha-detalhe').forEach(d => { d.hidden = true; });
+      tbody.querySelectorAll('.linha.is-aberto').forEach(l => l.classList.remove('is-aberto'));
+      det.hidden = !abrir;
+      tr.classList.toggle('is-aberto', abrir);
+      abertoId = abrir ? c.id : null;
+    };
+    tr.addEventListener('click', alternar);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+    ligarDetalhe(det, c);
+    tbody.append(tr, det);
   }
 
-  render(concursosState, filtroAtivo);
+  ligarOrdenacao(lista.querySelector('table'), ordem, () => { prefGravar('concursos:ordem', ordem); render(); });
+}
+
+// ---------------------------------------------------------------- tela
+
+let vistaAtual = () => 'cartoes';
+
+function renderResumo(visiveis) {
+  const abertos = visiveis.filter(c => { const d = diasAte(c.datas?.inscricao_fim); return d !== null && d >= 0; });
+  const urgentes = abertos.filter(c => diasAte(c.datas.inscricao_fim) <= 15).length;
+  const novos = visiveis.filter(ehNovo).length;
+  const partes = [plural(visiveis.length, 'concurso', 'concursos')];
+  if (urgentes) partes.push(`${urgentes} com inscrições em até 15 dias`);
+  if (novos) partes.push(plural(novos, 'novo', 'novos') + ' nesta semana');
+  document.getElementById('resumo').textContent = partes.join(' · ');
+}
+
+function renderAtualizado() {
+  const el = document.getElementById('updated-at');
+  const datas = concursosState.map(c => new Date(c.coletado_em).getTime()).filter(t => !Number.isNaN(t));
+  const coleta = datas.length ? `Última coleta ${formatarData(new Date(Math.max(...datas)).toISOString())}` : '';
+  const copia = cacheIdade(CACHE_CHAVE);
+  el.textContent = coleta;
+  el.title = copia ? `Dados guardados neste navegador às ${formatarHora(copia)}` : '';
+}
+
+function render() {
+  const visiveis = concursosState.filter(passaFiltros);
+  const vista = vistaAtual();
+  const grade = document.getElementById('stack');
+  const lista = document.getElementById('lista');
+  grade.hidden = vista !== 'cartoes';
+  lista.hidden = vista !== 'lista';
+
+  if (vista === 'cartoes') {
+    // mais urgente primeiro; sem prazo e encerrados por último
+    const ordenados = [...visiveis].sort((a, b) => comparar(VALOR_ORDEM.dias(a), VALOR_ORDEM.dias(b), 'asc'));
+    grade.replaceChildren(...ordenados.map(renderCard));
+    lista.innerHTML = '';
+  } else {
+    grade.replaceChildren();
+    renderLista(visiveis);
+  }
+
+  document.getElementById('empty-state').hidden = visiveis.length > 0;
+  document.getElementById('f-limpar').hidden = !filtrosAtivos();
+  renderResumo(visiveis);
+  renderAtualizado();
+}
+
+function receber(dados) {
+  concursosState = Array.isArray(dados) ? dados : [];
+  atualizarOpcoesFiltros();
+  render();
+}
+
+function init() {
+  vistaAtual = ligarVista(document.getElementById('vista'), 'concursos:vista', render);
+  ligarFiltros();
+  atualizarOpcoesFiltros();
+
+  if (!cacheLer(CACHE_CHAVE)) document.getElementById('resumo').textContent = 'Carregando concursos…';
+  carregarComCache(CACHE_CHAVE, DATA_URL, receber);
+
+  const recarregar = document.getElementById('recarregar');
+  recarregar.addEventListener('click', async () => {
+    recarregar.disabled = true;
+    recarregar.textContent = 'Recarregando…';
+    avisar('');
+    await carregarComCache(CACHE_CHAVE, DATA_URL, receber, { forcar: true });
+    recarregar.disabled = false;
+    recarregar.textContent = 'Recarregar';
+  });
 }
 
 init();

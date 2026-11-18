@@ -3,52 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radar Odisse — Concursos</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<title>Concursos — Radar Odisse</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
+<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="u-pagina">
 
-  <header class="topbar">
-    <div class="topbar__mark">ODISSE · RADAR</div>
-    <nav class="topbar__nav">
-      <a class="topbar__nav-link topbar__nav-link--active" href="index.html">Concursos</a>
-      <a class="topbar__nav-link" href="terrenos.html">Terrenos</a>
-    </nav>
-    <div class="topbar__meta"></div>
-  </header>
+  <header class="topo" data-pagina="concursos"></header>
 
-  <main class="stage">
-    <div class="stage__col">
-      <div class="stage__header">
-        <div class="stage__intro">
-          <p class="step__eyebrow">Radar</p>
-          <h1 class="step__title">Concursos em monitoramento</h1>
-        </div>
-        <div class="stage__controls">
-          <div class="filter-group" id="filter-group" role="group" aria-label="Filtrar concursos">
-            <button type="button" class="filter-btn" data-filter="novos">Novos</button>
-            <button type="button" class="filter-btn filter-btn--active" data-filter="ativos">Monitoramento ativo</button>
-            <button type="button" class="filter-btn" data-filter="arquivados">Arquivados</button>
-            <button type="button" class="filter-btn" data-filter="todos">Todos</button>
-          </div>
-          <span class="updated-at" id="updated-at"></span>
-        </div>
+  <main class="pagina">
+    <div class="pagina__barra">
+      <h1>Concursos</h1>
+      <div class="vista" id="vista" role="group" aria-label="Visualização">
+        <button type="button" data-vista="cartoes">Cartões</button>
+        <button type="button" data-vista="lista">Lista</button>
       </div>
-
-      <div class="stack" id="stack" aria-live="polite"></div>
-      <p class="empty-state" id="empty-state" hidden>
-        Nenhum concurso encontrado para esse filtro. Selecione "Todos" acima para ver o histórico completo.
-      </p>
+      <div class="pagina__estado">
+        <span class="atualizado" id="updated-at"></span>
+        <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
+      </div>
     </div>
+
+    <div class="filtros" id="filtros">
+      <input type="search" id="f-busca" placeholder="Buscar nome, promotor, local" aria-label="Buscar">
+      <select id="f-situacao" aria-label="Situação">
+        <option value="ativos">Monitoramento ativo</option>
+        <option value="novos">Novos (últimos 7 dias)</option>
+        <option value="arquivados">Arquivados e encerrados</option>
+        <option value="todos">Todas as situações</option>
+      </select>
+      <select id="f-prazo" aria-label="Prazo de inscrição">
+        <option value="">Qualquer prazo</option>
+        <option value="15">Em até 15 dias</option>
+        <option value="45">Em 16 a 45 dias</option>
+        <option value="mais">Em mais de 45 dias</option>
+        <option value="sem">Sem prazo informado</option>
+      </select>
+      <select id="f-escopo" aria-label="Escopo"></select>
+      <select id="f-tipo" aria-label="Abrangência">
+        <option value="">Nacional ou internacional</option>
+        <option value="nacional">Nacionais</option>
+        <option value="internacional">Internacionais</option>
+      </select>
+      <select id="f-inscricao" aria-label="Inscrição">
+        <option value="">Gratuita ou paga</option>
+        <option value="gratuita">Inscrição gratuita</option>
+        <option value="paga">Inscrição paga</option>
+      </select>
+      <select id="f-fonte" aria-label="Fonte"></select>
+      <button type="button" class="filtros__limpar" id="f-limpar" hidden>Limpar filtros</button>
+    </div>
+
+    <p class="aviso" id="aviso" hidden></p>
+    <p class="resumo" id="resumo"></p>
+
+    <div class="grade" id="stack" aria-live="polite"></div>
+    <div class="lista" id="lista" aria-live="polite" hidden></div>
+    <p class="vazio" id="empty-state" hidden>Nenhum concurso com esses filtros.</p>
   </main>
 
-  <footer class="footer">
-    <span id="footer-count"></span>
-  </footer>
-
+  <script src="js/comum.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

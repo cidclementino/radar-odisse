@@ -3,60 +3,101 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radar Odisse — Terrenos</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+<title>Terrenos — Radar Odisse</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
+<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
 <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="u-pagina">
 
-  <header class="topbar">
-    <div class="topbar__mark">ODISSE · RADAR</div>
-    <nav class="topbar__nav">
-      <a class="topbar__nav-link" href="index.html">Concursos</a>
-      <a class="topbar__nav-link topbar__nav-link--active" href="terrenos.html">Terrenos</a>
-    </nav>
-    <div class="topbar__meta">
-      <label class="switch-row">
-        <span class="switch-row__hint">Mostrar todos</span>
-        <span class="switch">
-          <input type="checkbox" id="toggle-all">
-          <span class="switch__track"></span>
-          <span class="switch__thumb"></span>
-        </span>
-      </label>
+  <header class="topo" data-pagina="terrenos"></header>
+
+  <main class="pagina">
+    <div class="pagina__barra">
+      <h1>Terrenos</h1>
+      <div class="vista" id="vista" role="group" aria-label="Visualização">
+        <button type="button" data-vista="cartoes">Cartões</button>
+        <button type="button" data-vista="lista">Lista</button>
+      </div>
+      <div class="pagina__estado">
+        <span class="atualizado" id="updated-at"></span>
+        <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
+      </div>
     </div>
-  </header>
+    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade. O sistema registra o sinal; a leitura de abordagem é manual.</p>
 
-  <main class="stage">
-    <div class="stage__col">
-      <div class="stage__intro">
-        <p class="step__eyebrow">Radar</p>
-        <h1 class="step__title">Oportunidades de terreno</h1>
-        <p class="step__desc">Sinais de terrenista e de corretor, coletados via OLX, ZAP Imóveis e YouTube. Classificados por nível de maturidade — o sistema registra o sinal, a leitura de abordagem é manual.</p>
+    <section aria-labelledby="titulo-oportunidades">
+      <h2 class="secao__titulo" id="titulo-oportunidades">Oportunidades</h2>
+      <div class="filtros">
+        <input type="search" id="f-busca" placeholder="Buscar no título ou no local" aria-label="Buscar oportunidades">
+        <select id="f-situacao" aria-label="Situação">
+          <option value="monitorando">Em monitoramento</option>
+          <option value="todas">Todas as situações</option>
+          <option value="ocultas">Abordadas ou descartadas</option>
+        </select>
+        <select id="f-nivel" aria-label="Nível de maturidade">
+          <option value="">Todos os níveis</option>
+          <option value="3">Nível 3 · Processo aberto</option>
+          <option value="2">Nível 2 · Qualificado</option>
+          <option value="2+">Nível 2 ou 3</option>
+          <option value="1">Nível 1 · Observação</option>
+        </select>
+        <select id="f-persona" aria-label="Persona">
+          <option value="">Terrenistas e corretores</option>
+          <option value="terrenista">Terrenistas</option>
+          <option value="corretor">Corretores</option>
+        </select>
+        <select id="f-cidade" aria-label="Cidade ou região"></select>
+        <select id="f-fonte" aria-label="Fonte"></select>
+        <select id="f-periodo" aria-label="Período da coleta">
+          <option value="">Coletadas em qualquer data</option>
+          <option value="7">Coletadas nos últimos 7 dias</option>
+          <option value="30">Nos últimos 30 dias</option>
+          <option value="90">Nos últimos 90 dias</option>
+        </select>
+        <button type="button" class="filtros__limpar" id="f-limpar" hidden>Limpar filtros</button>
       </div>
 
-      <div class="stack" id="stack-oportunidades" aria-live="polite"></div>
-      <p class="empty-state" id="empty-state" hidden>
-        Nenhuma oportunidade em monitoramento no momento. Ative "Mostrar todos" acima para ver o histórico completo.
-      </p>
+      <p class="aviso" id="aviso" hidden></p>
+      <p class="resumo" id="resumo"></p>
 
-      <div class="section-divider" id="section-corretores">
-        <p class="step__eyebrow">Corretores</p>
-        <h2 class="step__title step__title--small">Perfis acumulados</h2>
-        <p class="step__desc">Corretores descobertos via YouTube e/ou ZAP Imóveis. Fusão por nome → CRECI → empresa.</p>
+      <div class="grade grade--compacta" id="stack-oportunidades" aria-live="polite"></div>
+      <div class="lista" id="lista-oportunidades" aria-live="polite" hidden></div>
+      <p class="vazio" id="empty-state" hidden>Nenhuma oportunidade com esses filtros.</p>
+    </section>
+
+    <section class="secao" id="section-corretores" aria-labelledby="titulo-corretores">
+      <h2 class="secao__titulo" id="titulo-corretores">Corretores</h2>
+      <p class="pagina__intro">Perfis acumulados a partir do YouTube e do ZAP Imóveis. Fusão por nome, CRECI e empresa.</p>
+      <div class="filtros">
+        <input type="search" id="c-busca" placeholder="Buscar por nome, empresa ou CRECI" aria-label="Buscar corretores">
+        <select id="c-nivel" aria-label="Nível de maturidade">
+          <option value="">Todos os níveis</option>
+          <option value="3">Nível 3 · Processo aberto</option>
+          <option value="2">Nível 2 · Qualificado</option>
+          <option value="2+">Nível 2 ou 3</option>
+          <option value="1">Nível 1 · Observação</option>
+        </select>
+        <select id="c-regiao" aria-label="Região de atuação"></select>
+        <select id="c-via" aria-label="Descoberto via"></select>
+        <select id="c-creci" aria-label="CRECI">
+          <option value="">Com ou sem CRECI</option>
+          <option value="com">Com CRECI informado</option>
+          <option value="sem">Sem CRECI</option>
+        </select>
+        <button type="button" class="filtros__limpar" id="c-limpar" hidden>Limpar filtros</button>
       </div>
-
-      <div class="corretor-list" id="corretor-list" aria-live="polite"></div>
-      <div class="load-more-wrap" id="corretor-load-more"></div>
-    </div>
+      <p class="resumo" id="resumo-corretores"></p>
+      <div class="corretores" id="corretor-list" aria-live="polite"></div>
+      <div class="lista" id="lista-corretores" hidden></div>
+      <div class="carregar-mais" id="corretor-load-more"></div>
+    </section>
   </main>
 
-  <footer class="footer">
-    <span id="footer-count"></span>
-  </footer>
-
+  <script src="js/comum.js"></script>
   <script src="js/terrenos.js"></script>
 </body>
 </html>

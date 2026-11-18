@@ -10,16 +10,23 @@ const WORKER = 'https://radar-odisse.reservaprojectbasework.workers.dev';
 
 // ---------------------------------------------------------------- barra
 
+// Endereços limpos: quem abrir um link antigo (terrenos.html, index.html) vê o endereço sem o ".html".
+// Só troca o que aparece na barra do navegador; a página não recarrega.
+if (/\.html$/.test(location.pathname)) {
+  const limpo = location.pathname.replace(/(^|\/)index\.html$/, '$1').replace(/\.html$/, '');
+  history.replaceState(null, '', limpo + location.search + location.hash);
+}
+
 (function montarBarra() {
   const raiz = document.querySelector('header.topo');
   if (!raiz) return;
   const pagina = raiz.dataset.pagina;
   const SECOES = [
-    { id: 'concursos', nome: 'Concursos', href: 'index.html' },
-    { id: 'terrenos', nome: 'Terrenos', href: 'terrenos.html' },
+    { id: 'concursos', nome: 'Concursos', href: '/' },
+    { id: 'terrenos', nome: 'Terrenos', href: '/terrenos' },
   ];
   raiz.innerHTML = `
-    <a class="topo__casa" href="index.html" title="Radar">
+    <a class="topo__casa" href="/" title="Radar">
       <span class="topo__selo" aria-hidden="true"></span>
       <span class="topo__logotipo" role="img" aria-label="Odisse"></span>
       <span class="topo__sub">Radar</span>
@@ -257,9 +264,9 @@ function montarSubnav(atual) {
   const nav = document.getElementById('subnav');
   if (!nav) return;
   const ABAS = [
-    { id: 'geral', nome: 'Monitoramento geral', href: 'index.html' },
-    { id: 'acompanhamento', nome: 'Acompanhamento', href: 'acompanhamento.html', contador: 'contador-acompanhamento' },
-    { id: 'revisao', nome: 'Revisão', href: 'revisao.html', contador: 'contador-revisao' },
+    { id: 'geral', nome: 'Monitoramento geral', href: '/' },
+    { id: 'acompanhamento', nome: 'Acompanhamento', href: '/acompanhamento', contador: 'contador-acompanhamento' },
+    { id: 'revisao', nome: 'Revisão', href: '/revisao', contador: 'contador-revisao' },
   ];
   nav.innerHTML = ABAS.map(a => `<a href="${a.href}"${a.id === atual ? ' class="is-atual" aria-current="page"' : ''}>${a.nome}${a.contador ? `<span class="contador" id="${a.contador}" hidden></span>` : ''}</a>`).join('');
   atualizarContadores();

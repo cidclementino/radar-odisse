@@ -356,7 +356,7 @@ function renderCard(c) {
   const botaoAcomp = el.querySelector('.js-acompanhar');
   botaoAcomp.addEventListener('click', async e => {
     e.stopPropagation();
-    if (c.status_interno === 'inscrito') { location.href = 'acompanhamento.html'; return; }
+    if (c.status_interno === 'inscrito') { location.href = '/acompanhamento'; return; }
     botaoAcomp.disabled = true;
     await mudarSituacao(c, c.status_interno === 'acompanhando' ? 'monitorando' : 'acompanhando');
     botaoAcomp.disabled = false;

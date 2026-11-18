@@ -13,6 +13,8 @@ const NIVEL_LABELS = { 1: 'Nível 1 · Observação', 2: 'Nível 2 · Qualificad
 const NIVEL_CURTO = { 1: 'Observação', 2: 'Qualificado', 3: 'Processo aberto' };
 const PERSONA_LABELS = { terrenista: 'Terrenista', corretor: 'Corretor' };
 const FONTE_LABELS = { 'olx.com.br': 'OLX', 'zapimoveis.com.br': 'ZAP Imóveis', 'youtube.com': 'YouTube', manual: 'Cadastro manual' };
+const CATEGORIA_LABELS = { terreno: 'Terreno', imovel: 'Imóvel para retrofit' };
+const categoriaDe = op => op.categoria || 'terreno';
 const STATUS_LABELS = { monitorando: 'Monitorando', abordado: 'Abordado', descartado: 'Descartado', no_funil: 'No funil' };
 
 const fonteNome = f => FONTE_LABELS[f] || f;
@@ -43,7 +45,7 @@ let vistaAtual = () => 'cartoes';
 
 // ================================================================ OPORTUNIDADES
 
-const FILTROS_OP_PADRAO = { busca: '', situacao: 'monitorando', nivel: '', persona: '', cidade: '', fonte: '', periodo: '' };
+const FILTROS_OP_PADRAO = { busca: '', situacao: 'monitorando', nivel: '', categoria: '', persona: '', cidade: '', fonte: '', periodo: '' };
 let filtrosOp = { ...FILTROS_OP_PADRAO, ...prefLer('terrenos:filtros', {}), busca: '' };
 
 function passaOp(op) {
@@ -54,6 +56,7 @@ function passaOp(op) {
     if (!normalizar(filtrosOp.busca).split(/\s+/).filter(Boolean).every(t => alvo.includes(t))) return false;
   }
   if (!nivelBate(op.nivel_maturidade, filtrosOp.nivel)) return false;
+  if (filtrosOp.categoria && categoriaDe(op) !== filtrosOp.categoria) return false;
   if (filtrosOp.persona && op.persona !== filtrosOp.persona) return false;
   if (filtrosOp.cidade && cidadeDe(op.local) !== filtrosOp.cidade) return false;
   if (filtrosOp.fonte && op.fonte !== filtrosOp.fonte) return false;
@@ -65,7 +68,7 @@ function passaOp(op) {
 }
 
 function ligarFiltrosOp() {
-  const campos = { busca: 'f-busca', situacao: 'f-situacao', nivel: 'f-nivel', persona: 'f-persona', cidade: 'f-cidade', fonte: 'f-fonte', periodo: 'f-periodo' };
+  const campos = { busca: 'f-busca', situacao: 'f-situacao', nivel: 'f-nivel', categoria: 'f-categoria', persona: 'f-persona', cidade: 'f-cidade', fonte: 'f-fonte', periodo: 'f-periodo' };
   for (const [k, id] of Object.entries(campos)) {
     const el = document.getElementById(id);
     el.value = filtrosOp[k];
@@ -111,6 +114,7 @@ function renderOportunidadeCard(op) {
   el.innerHTML = `
     ${thumb && op.link_original ? `<a href="${escapeHTML(op.link_original)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img class="oportunidade__thumb" src="${escapeHTML(thumb)}" alt="" loading="lazy" decoding="async"></a>` : ''}
     <div class="oportunidade__tags">
+      ${categoriaDe(op) === 'imovel' ? `<span class="u-etiqueta selo-imovel">${CATEGORIA_LABELS.imovel}</span>` : ''}
       <span class="u-etiqueta suave">${escapeHTML(PERSONA_LABELS[op.persona] || op.persona)}</span>
       ${etiquetaNivel(op.nivel_maturidade)}
       ${STATUS_OCULTOS.has(op.status_interno) ? `<span class="u-etiqueta">${escapeHTML(STATUS_LABELS[op.status_interno])}</span>` : ''}
@@ -131,6 +135,7 @@ function renderOportunidadeCard(op) {
 const COLUNAS_OP = [
   { id: 'titulo', rotulo: 'Oportunidade' },
   { id: 'nivel', rotulo: 'Nível', classe: 'col-media' },
+  { id: 'categoria', rotulo: 'Tipo', classe: 'col-media' },
   { id: 'persona', rotulo: 'Persona', classe: 'col-media' },
   { id: 'local', rotulo: 'Local' },
   { id: 'fonte', rotulo: 'Fonte', classe: 'col-media' },
@@ -144,6 +149,7 @@ let ordemOp = prefLer('terrenos:ordem', { coluna: 'nivel', direcao: 'desc' });
 const VALOR_OP = {
   titulo: o => normalizar(o.titulo),
   nivel: o => o.nivel_maturidade ?? null,
+  categoria: o => CATEGORIA_LABELS[categoriaDe(o)],
   persona: o => o.persona,
   local: o => normalizar(o.local),
   fonte: o => fonteNome(o.fonte),
@@ -163,6 +169,7 @@ function renderListaOp(itens) {
         <div>${linkOuTexto(o.link_original, o.titulo, 'linha__titulo')}${botaoEditar('Editar terreno', o.id)}
         ${STATUS_OCULTOS.has(o.status_interno) ? `<div class="u-apoio">${escapeHTML(STATUS_LABELS[o.status_interno])}</div>` : ''}</div></div></td>
       <td class="col-media">${etiquetaNivel(o.nivel_maturidade, true)}</td>
+      <td class="col-media">${categoriaDe(o) === 'imovel' ? 'Imóvel' : 'Terreno'}</td>
       <td class="col-media">${escapeHTML(PERSONA_LABELS[o.persona] || o.persona || '')}</td>
       <td>${escapeHTML(o.local || '')}</td>
       <td class="col-media">${escapeHTML(fonteNome(o.fonte))}</td>
@@ -600,11 +607,12 @@ async function editarOportunidade(op) {
   // a lista de corretores pode ainda não ter vindo (a seção carrega quando entra na tela)
   if (!corretoresProntos) await carregarComCache('corretores', CORRETORES_URL, receberCorretores);
   abrirFormulario({
-    titulo: criando ? 'Novo terreno' : 'Editar terreno',
+    titulo: criando ? 'Novo terreno ou imóvel' : (categoriaDe(op) === 'imovel' ? 'Editar imóvel' : 'Editar terreno'),
     criando,
     nota: criando ? 'Terreno cadastrado à mão (indicação, anúncio visto fora do Radar…).' : NOTA_MANUAL,
     campos: [
       { nome: 'titulo', rotulo: 'Título', valor: op.titulo, obrigatorio: true, largo: true },
+      { nome: 'categoria', rotulo: 'Tipo', tipo: 'select', valor: categoriaDe(op), opcoes: [['terreno', 'Terreno'], ['imovel', 'Imóvel para retrofit']] },
       { nome: 'local', rotulo: 'Local', valor: op.local, placeholder: 'Bairro, cidade' },
       { nome: 'corretor_vinculado_id', rotulo: 'Corretor', tipo: 'select', valor: op.corretor_vinculado_id || '', opcoes: opcoesCorretor(op.corretor_vinculado_id) },
       { nome: 'nivel_maturidade', rotulo: 'Nível', tipo: 'select', valor: op.nivel_maturidade || 1, opcoes: OPCOES_NIVEL, numero: true },

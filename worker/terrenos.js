@@ -100,6 +100,7 @@ const CAMPOS_OPORTUNIDADE = {
   titulo: v => texto(v, 300),
   local: v => texto(v, 200),
   persona: umDe(['terrenista', 'corretor']),
+  categoria: umDe(['terreno', 'imovel']),
   nivel_maturidade: nivel,
   link_original: link,
   observacoes: textoLongo,
@@ -242,6 +243,7 @@ export async function criarOportunidadeManual(request, env, json) {
   const nova = {
     id: idNovo('manual'),
     persona: valores.corretor_vinculado_id ? 'corretor' : 'terrenista',
+    categoria: 'terreno',
     fonte: 'manual',
     local: null,
     nivel_maturidade: 1,

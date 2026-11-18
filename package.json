@@ -12,7 +12,9 @@
     "parse:olx": "node parsers/olx.js",
     "parse:zap": "node parsers/zap.js",
     "parse:youtube": "node parsers/youtube.js",
-    "test": "node --test testes/*.test.js testes/*.test.mjs"
+    "test": "node --test testes/*.test.js testes/*.test.mjs",
+    "collect:licitacoes": "node scripts/collect-licitacoes-and-send.js",
+    "parse:pncp": "node parsers/pncp.js"
   },
   "keywords": [],
   "author": "Odisse Estúdio de Arquitetura e Design",

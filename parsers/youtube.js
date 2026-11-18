@@ -20,7 +20,7 @@
 //   - Nem um nem outro: descartado (ruído — "terreno" sem contexto de
 //     corretor nem de permuta é ruído demais pra entrar como candidato).
 
-const { generateId } = require('./lib/normalize');
+const { generateId, normalizeText } = require('./lib/normalize');
 const { extrairContatos } = require('./lib/contatos');
 
 const FONTE = 'youtube.com';
@@ -46,12 +46,27 @@ const EXECUCAO_MANUAL = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
 // completado com Pitimbu, mesma faixa. RM Recife, Campina Grande e RM
 // Natal ganharam os municípios satélite com mais atividade imobiliária.
 const ROTACAO = {
-  1: { grupo: 'RM João Pessoa', queries: ['terreno João Pessoa', 'terreno Santa Rita PB', 'terreno Bayeux', 'terreno Cabedelo'] },
-  2: { grupo: 'Litoral Sul PB', queries: ['terreno Conde PB', 'terreno Jacumã', 'terreno Pitimbu'] },
-  3: { grupo: 'Campina Grande', queries: ['terreno Campina Grande', 'terreno Queimadas PB', 'terreno Lagoa Seca PB'] },
-  4: { grupo: 'RM Recife', queries: ['terreno Recife', 'terreno Olinda', 'terreno Jaboatão dos Guararapes', 'terreno Paulista PE', 'terreno Camaragibe', 'terreno Cabo de Santo Agostinho'] },
-  5: { grupo: 'RM Natal', queries: ['terreno Natal RN', 'terreno Parnamirim RN', 'terreno São Gonçalo do Amarante RN', 'terreno Macaíba RN'] },
+  1: { grupo: 'RM João Pessoa', queries: ['terreno João Pessoa', 'terreno Santa Rita PB', 'terreno Bayeux', 'terreno Cabedelo'],
+    retrofit: ['prédio à venda João Pessoa', 'galpão à venda João Pessoa', 'imóvel comercial à venda João Pessoa', 'casarão Centro Histórico João Pessoa'] },
+  2: { grupo: 'Litoral Sul PB', queries: ['terreno Conde PB', 'terreno Jacumã', 'terreno Pitimbu'], retrofit: [] },
+  3: { grupo: 'Campina Grande', queries: ['terreno Campina Grande', 'terreno Queimadas PB', 'terreno Lagoa Seca PB'],
+    retrofit: ['prédio à venda Campina Grande', 'galpão à venda Campina Grande'] },
+  4: { grupo: 'RM Recife', queries: ['terreno Recife', 'terreno Olinda', 'terreno Jaboatão dos Guararapes', 'terreno Paulista PE', 'terreno Camaragibe', 'terreno Cabo de Santo Agostinho'],
+    retrofit: ['prédio à venda Recife', 'galpão à venda Recife', 'casarão à venda Olinda'] },
+  5: { grupo: 'RM Natal', queries: ['terreno Natal RN', 'terreno Parnamirim RN', 'terreno São Gonçalo do Amarante RN', 'terreno Macaíba RN'],
+    retrofit: ['prédio à venda Natal RN', 'galpão à venda Natal RN'] },
 };
+
+// Imóveis para retrofit (nov/2026): prédio inteiro, galpão, casarão, imóvel comercial à venda — o
+// comprador vai precisar de projeto de reforma. Mesma mecânica dos terrenos (corretor como
+// contato), com `categoria: 'imovel'` na oportunidade. Ver TERRENOS.md, "Imóveis para retrofit".
+
+/** Tipo de imóvel que costuma pedir projeto de reforma (texto normalizado, sem acento). */
+const RE_IMOVEL_RETROFIT = /(predio inteiro|predio comercial|predio a venda|predio para venda|vendo predio|edificio inteiro|edificio comercial|galpao|casarao|imovel comercial|ponto comercial|sobrado comercial|imovel antigo|casa antiga|imovel historico|pousada a venda|hotel a venda)/;
+/** Sinal de que o imóvel vai mudar de uso ou ser reformado: sobe para nível 2. */
+const RE_SINAL_RETROFIT = /(retrofit|para reforma|precisa de reforma|a reformar|reformar|mudanca de uso|potencial construtivo|ideal para (clinica|escola|hotel|pousada|escritorio|loja|restaurante|investidor)|oportunidade de investimento|aceita permuta|permuta)/;
+/** Lançamentos e apartamentos: ruído na busca de "prédio". */
+const RE_RUIDO_RETROFIT = /(apartamento|lancamento|na planta|decorado|cobertura duplex)/;
 
 /** Termos que indicam disposição explícita de permuta/parceria no anúncio. */
 const RE_PERMUTA = /(permuta|parceria|incorpora|sociedade)/;
@@ -153,12 +168,27 @@ function enderecoCanal(canalId, canal) {
  *     como corretor/imobiliária — ruído demais pra virar candidato.
  */
 function classificarNivel({ titulo, descricao, canalTitulo, canalDescricao }) {
-  const texto = `${titulo} ${descricao}`.toLowerCase();
-  if (!/terreno/.test(texto)) return null;
+  return classificar({ titulo, descricao, canalTitulo, canalDescricao })?.nivel ?? null;
+}
 
-  if (RE_PERMUTA.test(texto)) return 2;
-  if (RE_CANAL_IMOBILIARIO.test(canalTitulo || '')) return 1;
-  if (RE_DESCRICAO_CORRETOR.test(canalDescricao || '')) return 1;
+/**
+ * Nível e categoria do vídeo: terreno (regra acima) ou imóvel para retrofit.
+ *   - imóvel, nível 2: tipo de imóvel + sinal de reforma, mudança de uso ou permuta;
+ *   - imóvel, nível 1: tipo de imóvel + canal de corretor/imobiliária;
+ *   - vídeo de apartamento ou lançamento (pelo título) não entra como imóvel.
+ */
+function classificar({ titulo, descricao, canalTitulo, canalDescricao }) {
+  const texto = `${titulo} ${descricao}`.toLowerCase();
+  const canalImobiliario = RE_CANAL_IMOBILIARIO.test(canalTitulo || '') || RE_DESCRICAO_CORRETOR.test(canalDescricao || '');
+  if (/terreno/.test(texto)) {
+    if (RE_PERMUTA.test(texto)) return { nivel: 2, categoria: 'terreno' };
+    if (canalImobiliario) return { nivel: 1, categoria: 'terreno' };
+    return null;
+  }
+  const t = normalizeText(`${titulo} ${descricao}`);
+  if (!RE_IMOVEL_RETROFIT.test(t) || RE_RUIDO_RETROFIT.test(normalizeText(titulo))) return null;
+  if (RE_SINAL_RETROFIT.test(t)) return { nivel: 2, categoria: 'imovel' };
+  if (canalImobiliario) return { nivel: 1, categoria: 'imovel' };
   return null;
 }
 
@@ -185,7 +215,7 @@ async function parse() {
   const corretoresCandidatos = [];
 
   for (const grupo of grupos) {
-    for (const query of grupo.queries) {
+    for (const query of [...grupo.queries, ...(grupo.retrofit || [])]) {
       try {
         const items = await buscarQuery(query, publishedAfter);
 
@@ -212,7 +242,7 @@ async function parse() {
         // "a API não retornou o vídeo" de "o filtro descartou o vídeo".
         const contagem = { 2: 0, 1: 0, descartado: 0 };
         for (const l of lidos) {
-          const n = classificarNivel(l);
+          const n = classificar(l)?.nivel ?? null;
           contagem[n === null ? 'descartado' : n]++;
         }
         console.log(
@@ -222,8 +252,9 @@ async function parse() {
         );
 
         for (const l of lidos) {
-          const nivel = classificarNivel(l);
-          if (nivel === null) continue;
+          const classe = classificar(l);
+          if (!classe) continue;
+          const { nivel, categoria } = classe;
 
           const { item, videoId, canalId, canal } = l;
           const link = `https://www.youtube.com/watch?v=${videoId}`;
@@ -234,6 +265,7 @@ async function parse() {
           oportunidades.push({
             id,
             persona: 'corretor',
+            categoria,
             fonte: FONTE,
             titulo: l.titulo,
             local: grupo.grupo,
@@ -274,7 +306,7 @@ async function parse() {
   return { oportunidades, corretoresCandidatos };
 }
 
-module.exports = { parse, FONTE };
+module.exports = { parse, FONTE, classificar, classificarNivel };
 
 if (require.main === module) {
   parse()

@@ -22,6 +22,12 @@ test('Projeto de arquitetura entra (só projeto)', () => {
   assert.ok(r.escopo.includes('urbanismo'));
 });
 
+test('Assessoria de projetos de arquitetura e urbanismo entra (objeto real, Cabo de Santo Agostinho)', () => {
+  const r = entra('Contratação de Empresa Especializada para Assessoramento e Elaboração de Projetos e Estudos de Engenharia, Arquitetura, Urbanismo e Paisagismo no Município do Cabo de Santo Agostinho', 'projeto');
+  assert.deepEqual(r.escopo.slice(0, 3), ['arquitetura', 'urbanismo', 'paisagismo']);
+  entra('Contratação Semi-Integrado de empresa de engenharia para prestação de serviço para a elaboração do projeto executivo e execução das obras de requalificação do centro', 'projeto_e_obra');
+});
+
 test('Contratação integrada entra marcada como projeto e obra (objeto real, João Pessoa)', () => {
   const r = entra('CONTRATAÇÃO INTEGRADA PARA ELABORAÇÃO DOS PROJETOS BÁSICO E EXECUTIVO E EXECUÇÃO DAS OBRAS E SERVIÇOS DE ENGENHARIA NECESSÁRIOS À IMPLANTAÇÃO DO CENTRO ESCOLAR MUNICIPAL DE ATIVIDADES PEDAGÓGICAS INTEGRADORAS CEMAPI', 'projeto_e_obra');
   assert.ok(r.escopo.includes('arquitetura'));
@@ -37,6 +43,8 @@ test('Infraestrutura e sistemas prediais sozinhos ficam fora (objetos reais, EBS
   fica('Contratação de empresa especializada, sob o regime de contratação semi-integrada, para a elaboração e desenvolvimento dos Projetos Executivos, a partir do Projeto Básico fornecido pelo Hospital Universitário Júlio Bandeira (HUJB), bem como para a execução das obras e serviços de engenharia necessários à implantação de uma Subestação de Energia Elétrica 13,8 kV/800 kVA');
   fica('Reedição da Contratação de empresa especializada na elaboração de projeto e execução de sistema de transporte vertical (elevadores) para atendimento das necessidades do Hospital Universitário Alcides Carneiro');
   fica('Aquisição de material de expediente');
+  fica('Contratação de pessoa jurídica especializada para prestação de serviços técnicos de elaboração, execução, monitoramento e avaliação do Projeto de Trabalho Social (PTS) do empreendimento habitacional');
+  fica('[Portal de Compras Públicas] - Contratação de solução integrada de segurança eletrônica para o Sistema Adutor Maxaranguape, incluindo elaboração de projeto, fornecimento e instalação nas unidades e sede');
   fica('Licença de software para elaboração de projetos BIM');
 });
 

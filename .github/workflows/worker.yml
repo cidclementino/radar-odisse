@@ -42,6 +42,19 @@ jobs:
         run: |
           npm install --no-save --prefix "$RUNNER_TEMP/wr" wrangler@4
           W="$RUNNER_TEMP/wr/node_modules/.bin/wrangler"
+          # Namespace de Licitações: acha pelo nome ou cria (API da Cloudflare, mesmo token), e põe o id
+          # no wrangler.toml desta publicação. Idempotente: nas próximas publicações só acha.
+          API="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/storage/kv/namespaces"
+          NOME="radar-odisse-LICITACOES"
+          acha_kv() { curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API?per_page=100" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const n=(JSON.parse(s).result||[]).find(x=>x.title===process.argv[1]);if(n)console.log(n.id)})' "$NOME"; }
+          KV_LICITACOES=$(acha_kv)
+          if [ -z "$KV_LICITACOES" ]; then
+            curl -fsS -X POST -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json" --data "{\"title\":\"$NOME\"}" "$API" >/dev/null
+            KV_LICITACOES=$(acha_kv)
+          fi
+          [ -n "$KV_LICITACOES" ] || { echo "::error::Não achei nem criei o namespace $NOME."; exit 1; }
+          echo "Namespace de Licitações: $KV_LICITACOES"
+          sed -i "s/__LICITACOES_ID__/$KV_LICITACOES/" wrangler.toml
           "$W" deploy
           printf '%s' "$RADAR_COLLECT_SECRET" | "$W" secret put COLLECT_SECRET
           printf '%s' "$RADAR_SENHA" | "$W" secret put RADAR_SENHA

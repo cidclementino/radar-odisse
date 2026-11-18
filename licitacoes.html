@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Licitações — Radar Odisse</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
+<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
+<link rel="stylesheet" href="css/styles.css?v=df1269af42">
+<script src="js/auth.js?v=72f6ee79ac"></script>
+<script>exigirAutenticacao();</script>
+  <script type="speculationrules">
+  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/licitacoes"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
+  </script>
+</head>
+<body class="u-pagina">
+
+  <header class="topo" data-pagina="licitacoes"></header>
+
+  <main class="pagina">
+    <div class="pagina__barra">
+      <h1>Licitações</h1>
+      <div class="vista" id="vista" role="group" aria-label="Visualização">
+        <button type="button" data-vista="cartoes">Cartões</button>
+        <button type="button" data-vista="lista">Lista</button>
+      </div>
+      <div class="pagina__estado">
+        <span class="atualizado" id="updated-at"></span>
+        <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
+      </div>
+    </div>
+    <p class="pagina__intro">Contratações públicas de projeto (arquitetura, urbanismo, paisagismo, interiores, restauro) com propostas abertas na Paraíba, em Pernambuco e no Rio Grande do Norte, lidas do PNCP em dias úteis. A borda mostra quanto falta para o fim das propostas. "Projeto e obra" marca a contratação integrada, em que o projeto vem junto com a execução.</p>
+
+    <div class="filtros" id="filtros">
+      <input type="search" id="f-busca" placeholder="Buscar no objeto, órgão ou município" aria-label="Buscar">
+      <select id="f-situacao" aria-label="Situação">
+        <option value="ativas">Propostas abertas</option>
+        <option value="acompanhando">Acompanhando ou participando</option>
+        <option value="ocultas">Encerradas ou descartadas</option>
+        <option value="todas">Todas as situações</option>
+      </select>
+      <select id="f-prazo" aria-label="Prazo das propostas">
+        <option value="">Qualquer prazo</option>
+        <option value="15">Em até 15 dias</option>
+        <option value="45">Em 16 a 45 dias</option>
+        <option value="mais">Em mais de 45 dias</option>
+      </select>
+      <select id="f-tipo" aria-label="Tipo de contratação">
+        <option value="">Projeto ou projeto e obra</option>
+        <option value="projeto">Só projeto</option>
+        <option value="projeto_e_obra">Projeto e obra</option>
+      </select>
+      <select id="f-escopo" aria-label="Escopo"></select>
+      <select id="f-uf" aria-label="Estado"></select>
+      <select id="f-modalidade" aria-label="Modalidade"></select>
+      <button type="button" class="filtros__limpar" id="f-limpar" hidden>Limpar filtros</button>
+    </div>
+
+    <p class="aviso" id="aviso" hidden></p>
+    <p class="resumo" id="resumo"></p>
+
+    <div class="grade" id="grade" aria-live="polite"></div>
+    <div class="lista" id="lista" aria-live="polite" hidden></div>
+    <p class="vazio" id="empty-state" hidden>Nenhuma licitação com esses filtros.</p>
+  </main>
+
+  <script src="js/comum.js?v=20742bad54"></script>
+  <script src="js/licitacoes.js?v=e3d5b59b1d"></script>
+</body>
+</html>

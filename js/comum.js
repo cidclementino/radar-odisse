@@ -1,4 +1,4 @@
-// Radar Odisse — peças comuns às duas páginas (Concursos e Terrenos)
+// Radar Odisse — peças comuns às páginas (Concursos, Terrenos e Licitações)
 //
 //   - barra no padrão das ferramentas do Universo (selo + logotipo + "Radar", seções no centro,
 //     botão "Universo" à direita, vindo de universo.odisse.com.br/base/v1/barra.js);
@@ -41,6 +41,7 @@ if (/\.html$/.test(location.pathname)) {
   const SECOES = [
     { id: 'concursos', nome: 'Concursos', href: '/' },
     { id: 'terrenos', nome: 'Terrenos', href: '/terrenos' },
+    { id: 'licitacoes', nome: 'Licitações', href: '/licitacoes' },
   ];
   raiz.innerHTML = `
     <a class="topo__casa" href="/" title="Radar">

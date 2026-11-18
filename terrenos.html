@@ -9,12 +9,12 @@
 <link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
 <link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
 <link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=6ac1d9d62e">
+<link rel="stylesheet" href="css/styles.css?v=df1269af42">
 <script src="js/auth.js?v=72f6ee79ac"></script>
 <script>exigirAutenticacao();</script>
   <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
   <script type="speculationrules">
-  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
+  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/licitacoes"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
   </script>
 </head>
 <body class="u-pagina">
@@ -33,7 +33,7 @@
         <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
       </div>
     </div>
-    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade. O sistema registra o sinal; a leitura de abordagem é manual. O lápis corrige ou completa terrenos e corretores, e o que for corrigido à mão a coleta não mexe mais.</p>
+    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade: terrenos e imóveis para retrofit (prédio inteiro, galpão, casarão, imóvel comercial à venda). O sistema registra o sinal; a leitura de abordagem é manual. O lápis corrige ou completa terrenos e corretores, e o que for corrigido à mão a coleta não mexe mais.</p>
 
     <section aria-labelledby="titulo-oportunidades">
       <div class="secao__cabeca">
@@ -53,6 +53,11 @@
           <option value="2">Nível 2 · Qualificado</option>
           <option value="2+">Nível 2 ou 3</option>
           <option value="1">Nível 1 · Observação</option>
+        </select>
+        <select id="f-categoria" aria-label="Terreno ou imóvel">
+          <option value="">Terrenos e imóveis</option>
+          <option value="terreno">Terrenos</option>
+          <option value="imovel">Imóveis para retrofit</option>
         </select>
         <select id="f-persona" aria-label="Persona">
           <option value="">Terrenistas e corretores</option>
@@ -114,7 +119,7 @@
     </section>
   </main>
 
-  <script src="js/comum.js?v=8e1686803a"></script>
-  <script src="js/terrenos.js?v=4144589a1c"></script>
+  <script src="js/comum.js?v=20742bad54"></script>
+  <script src="js/terrenos.js?v=d52543c912"></script>
 </body>
 </html>

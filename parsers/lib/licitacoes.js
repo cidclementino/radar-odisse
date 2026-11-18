@@ -17,8 +17,10 @@ const RE_ASSUNTO = /(arquitet|urban|paisag|interiores|restaur|patrimonio|tombad|
 const RE_INFRA = /(pavimenta|esgot|saneamento|drenagem|abastecimento de agua|adutora|rodovi|estrada|vicinal|ponte|eletrifica|iluminacao publica|\bpocos?\b|barragem|acude|aterro sanitario|georreferencia|topografi)/;
 // Sistemas prediais contratados sozinhos (subestação, elevador, ar-condicionado…): é engenharia de
 // instalação, não projeto de arquitetura. Fora, a não ser que o objeto também fale da edificação.
-const RE_SISTEMAS = /(subestac|elevador|transporte vertical|climatiza|ar condicionado|grupo gerador|cabeamento|rede logica|cftv|energia solar|fotovolta|usina|spda|para raio|gases medicinais)/;
+const RE_SISTEMAS = /(subestac|elevador|transporte vertical|climatiza|ar condicionado|grupo gerador|cabeamento|rede logica|cftv|energia solar|fotovolta|usina|spda|para raio|gases medicinais|seguranca eletronica|videomonitoramento|alarme)/;
 const RE_EDIFICACAO = /(arquitet|urban|paisag|implantacao d[oa]s?\s+(centro|escola|creche|unidade|sede|praca|parque|mercado)|construcao d|reforma d|ampliacao d|edificac|requalifica|restaur)/;
+// "Projeto" no sentido social, pedagógico, de captação: não é projeto de arquitetura.
+const RE_OUTRO_PROJETO = /(trabalho social|projetos? sociais?|projetos? pedagogic|projeto de vida|captacao de recursos|projetos? culturais?|projetos? de pesquisa|projetos? de lei)/;
 // Projeto e obra no mesmo contrato.
 const RE_COM_OBRA = /(contratacao integrada|semi ?integrada|projetos?\s+(\S+\s+){0,8}?e\s+(a\s+)?execu|elabora\w*\s+(\S+\s+){0,12}?e\s+(a\s+)?execu|execu\w*\s+(\S+\s+){0,6}?e\s+elabora)/;
 
@@ -37,6 +39,7 @@ function classificarObjeto(objeto, complemento = '') {
   if (!t) return null;
   const ehProjeto = RE_ELABORAR.test(t) || RE_PROJETO_ARQ.test(t) || RE_SERVICO_ARQ.test(t);
   if (!ehProjeto) return null;
+  if (RE_OUTRO_PROJETO.test(t) && !/(arquitet|urbanis|paisag)/.test(t)) return null;
   const assunto = RE_ASSUNTO.test(t);
   if (!assunto && !/arquitet|urban|paisag/.test(t)) return null;
   if (RE_INFRA.test(t) && !/(arquitet|urbanis|paisag|edifica|predio|escola|creche|praca|sede)/.test(t)) return null;

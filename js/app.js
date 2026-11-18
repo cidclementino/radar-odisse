@@ -60,6 +60,10 @@ function inscricaoTipo(c) {
 
 const nomeExibido = c => c.apelido || c.nome;
 const fontesDe = c => (c.fontes && c.fontes.length ? c.fontes : [c.fonte].filter(Boolean));
+// No filtro, os sites do IAB (nacional e departamentos: iabsp.org.br, iabrj.org.br…) viram uma fonte só.
+// O detalhe do concurso continua mostrando o site de origem.
+const grupoFonte = f => (/^iab[a-z-]*\.org\.br$/i.test(f) ? 'IAB' : f);
+const gruposFonteDe = c => [...new Set(fontesDe(c).map(grupoFonte))];
 
 // ---------------------------------------------------------------- filtros
 
@@ -95,7 +99,7 @@ function passaFiltros(c) {
   if (filtros.escopo && !(c.escopo || []).includes(filtros.escopo)) return false;
   if (filtros.tipo && c.tipo !== filtros.tipo) return false;
   if (filtros.inscricao && inscricaoTipo(c) !== filtros.inscricao) return false;
-  if (filtros.fonte && !fontesDe(c).includes(filtros.fonte)) return false;
+  if (filtros.fonte && !gruposFonteDe(c).includes(filtros.fonte)) return false;
   return true;
 }
 
@@ -131,7 +135,7 @@ function atualizarOpcoesFiltros() {
   const escopos = [...new Set(concursosState.flatMap(c => c.escopo || []))];
   preencherSelect(document.getElementById('f-escopo'),
     escopos.map(e => [e, ESCOPO_LABELS[e] || e]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR')), 'Todos os escopos');
-  const fontes = [...new Set(concursosState.flatMap(fontesDe))].sort();
+  const fontes = [...new Set(concursosState.flatMap(gruposFonteDe))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   preencherSelect(document.getElementById('f-fonte'), fontes.map(f => [f, f]), 'Todas as fontes');
   document.getElementById('f-escopo').value = escopos.includes(filtros.escopo) ? filtros.escopo : '';
   document.getElementById('f-fonte').value = fontes.includes(filtros.fonte) ? filtros.fonte : '';

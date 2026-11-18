@@ -83,6 +83,12 @@ async function buscarUmaUrl(url) {
     const creciMatch = textoBloco.match(REGEX_CRECI);
     const creci = creciMatch ? creciMatch[1].toUpperCase() : null;
 
+    // Papel 2 (decidido antes para o corretor poder ser ligado ao anúncio): sinal de terrenista —
+    // só se bater keyword.
+    const tituloNormalizado = normalizeText(titulo);
+    const ehOportunidade = bateKeywordTerrenista(tituloNormalizado);
+    const idOportunidade = ehOportunidade ? generateId(FONTE, href, titulo) : null;
+
     // Papel 1: enriquecimento de Corretor — sempre, quando há nome de anunciante.
     if (anunciante) {
       corretoresCandidatos.push({
@@ -91,14 +97,13 @@ async function buscarUmaUrl(url) {
         creci,
         regiao,
         fonte: FONTE,
+        oportunidade_id: idOportunidade,
       });
     }
 
-    // Papel 2: sinal de terrenista — só se bater keyword.
-    const tituloNormalizado = normalizeText(titulo);
-    if (bateKeywordTerrenista(tituloNormalizado)) {
+    if (ehOportunidade) {
       oportunidades.push({
-        id: generateId(FONTE, href, titulo),
+        id: idOportunidade,
         persona: 'terrenista',
         fonte: FONTE,
         titulo: titulo.trim(),

@@ -232,7 +232,7 @@ let corretoresMostrados = LOTE;
 
 function passaCorretor(c) {
   if (filtrosC.busca) {
-    const alvo = normalizar(`${c.nome} ${c.empresa || ''} ${c.creci || ''}`);
+    const alvo = normalizar(`${c.nome} ${c.empresa || ''} ${c.creci || ''} ${c.instagram || ''} ${c.email || ''} ${(c.whatsapp || c.telefone || '').replace(/\D/g, '')}`);
     if (!normalizar(filtrosC.busca).split(/\s+/).filter(Boolean).every(t => alvo.includes(t))) return false;
   }
   if (!nivelBate(c.nivel_maturidade, filtrosC.nivel)) return false;
@@ -274,10 +274,31 @@ function atualizarOpcoesC() {
   document.getElementById('c-via').value = vias.includes(filtrosC.via) ? filtrosC.via : '';
 }
 
+/** +5583999887766 → (83) 99988-7766 */
+function formatarTelefone(tel) {
+  const d = (tel || '').replace(/\D/g, '').replace(/^55/, '');
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return tel || '';
+}
+
+/** Contatos lidos na coleta (WhatsApp, telefone, Instagram, e-mail, canal), como links. */
+function contatosCorretor(c) {
+  const itens = [];
+  if (c.whatsapp) itens.push(`<a href="https://wa.me/${escapeHTML(c.whatsapp.replace(/\D/g, ''))}" target="_blank" rel="noopener">WhatsApp ${escapeHTML(formatarTelefone(c.whatsapp))}</a>`);
+  if (c.telefone) itens.push(`<a href="tel:${escapeHTML(c.telefone)}">Tel. ${escapeHTML(formatarTelefone(c.telefone))}</a>`);
+  if (c.instagram) itens.push(`<a href="https://www.instagram.com/${encodeURIComponent(c.instagram)}/" target="_blank" rel="noopener">@${escapeHTML(c.instagram)}</a>`);
+  if (c.email) itens.push(`<a href="mailto:${escapeHTML(c.email)}">${escapeHTML(c.email)}</a>`);
+  if (c.canal_url) itens.push(`<a href="${escapeHTML(c.canal_url)}" target="_blank" rel="noopener">Canal</a>`);
+  return itens;
+}
+
 function renderCorretorCartao(c) {
   const el = document.createElement('article');
-  el.className = 'corretor';
+  el.className = `corretor${c.foto_url ? ' corretor--foto' : ''}`;
+  const contatos = contatosCorretor(c);
   el.innerHTML = `
+    ${c.foto_url ? `<img class="corretor__foto" src="${escapeHTML(c.foto_url)}" alt="" loading="lazy" decoding="async">` : ''}
     <div>
       <p class="corretor__nome">${escapeHTML(c.nome)}</p>
       ${c.empresa && c.empresa !== c.nome ? `<p class="corretor__empresa">${escapeHTML(c.empresa)}</p>` : ''}
@@ -286,11 +307,13 @@ function renderCorretorCartao(c) {
         <span>Via ${escapeHTML((c.descoberto_via || []).map(fonteNome).join(', '))}</span>
         ${c.volume_zap ? `<span>${plural(c.volume_zap, 'terreno', 'terrenos')} no ZAP</span>` : ''}
       </div>
+      ${contatos.length ? `<div class="corretor__contatos">${contatos.join('')}</div>` : ''}
     </div>
     <div class="corretor__selos">
       ${c.creci ? `<span class="u-etiqueta suave">CRECI ${escapeHTML(c.creci)}</span>` : ''}
       ${etiquetaNivel(c.nivel_maturidade)}
     </div>`;
+  el.querySelector('img.corretor__foto')?.addEventListener('error', e => e.target.remove(), { once: true });
   return el;
 }
 
@@ -299,6 +322,7 @@ const COLUNAS_C = [
   { id: 'nivel', rotulo: 'Nível', classe: 'col-media' },
   { id: 'regioes', rotulo: 'Regiões' },
   { id: 'creci', rotulo: 'CRECI', classe: 'col-media' },
+  { id: 'contato', rotulo: 'Contato', classe: 'col-larga' },
   { id: 'via', rotulo: 'Descoberto via', classe: 'col-larga' },
   { id: 'zap', rotulo: 'Terrenos no ZAP', classe: 'col-num col-media' },
   { id: 'oportunidades', rotulo: 'Oportunidades', classe: 'col-num col-media' },
@@ -312,6 +336,7 @@ const VALOR_C = {
   nivel: c => c.nivel_maturidade ?? null,
   regioes: c => (c.regioes_atuacao || []).join(', ') || null,
   creci: c => c.creci || null,
+  contato: c => c.whatsapp || c.telefone || c.instagram || c.email || null,
   via: c => (c.descoberto_via || []).map(fonteNome).join(', '),
   zap: c => c.volume_zap || null,
   oportunidades: c => (c.oportunidades_vinculadas || []).length || null,
@@ -328,6 +353,7 @@ function renderListaC(itens) {
       <td class="col-media">${etiquetaNivel(c.nivel_maturidade, true)}</td>
       <td>${escapeHTML((c.regioes_atuacao || []).join(', '))}</td>
       <td class="col-media">${escapeHTML(c.creci || '')}</td>
+      <td class="col-larga"><div class="corretor__contatos corretor__contatos--lista">${contatosCorretor(c).join('')}</div></td>
       <td class="col-larga">${escapeHTML((c.descoberto_via || []).map(fonteNome).join(', '))}</td>
       <td class="col-num col-media">${c.volume_zap || ''}</td>
       <td class="col-num col-media">${(c.oportunidades_vinculadas || []).length || ''}</td>

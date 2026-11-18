@@ -508,7 +508,7 @@ async function handleCollectTerrenos(request, env) {
   // "corretor" (ex: YouTube) e o enriquecimento do ZAP dependem dos ids
   // resultantes pra preencher corretor_vinculado_id.
   const corretoresExistentes = await listAll(env.CORRETORES);
-  const corretoresAtualizados = processarCandidatosCorretor(corretoresExistentes, corretoresCandidatos);
+  const { corretores: corretoresAtualizados, vinculos } = processarCandidatosCorretor(corretoresExistentes, corretoresCandidatos);
 
   for (const corretor of corretoresAtualizados.values()) {
     await env.CORRETORES.put(corretor.id, JSON.stringify(corretor));
@@ -517,8 +517,21 @@ async function handleCollectTerrenos(request, env) {
   // 2. Grava as Oportunidades (sem dedup entre fontes por ora — cada fonte
   // gera seu próprio id; ver TERRENOS.md, não havia decisão de dedup entre
   // fontes de terrenista igual à de Concurso).
-  for (const op of oportunidades) {
-    await env.OPORTUNIDADES.put(op.id, JSON.stringify(op));
+  // Uma oportunidade que já existe (coletada de novo) mantém o que foi decidido no painel
+  // (situação e qualquer campo que a coleta não produz) e a data da primeira coleta.
+  const existentes = await Promise.all(oportunidades.map(op => env.OPORTUNIDADES.get(op.id, 'json')));
+  for (const [i, op] of oportunidades.entries()) {
+    const antiga = existentes[i];
+    const gravar = {
+      ...(antiga || {}),
+      ...op,
+      corretor_vinculado_id: vinculos.get(op.id) || antiga?.corretor_vinculado_id || op.corretor_vinculado_id || null,
+    };
+    if (antiga) {
+      gravar.status_interno = antiga.status_interno || op.status_interno;
+      gravar.coletado_em = antiga.coletado_em || op.coletado_em;
+    }
+    await env.OPORTUNIDADES.put(op.id, JSON.stringify(gravar));
   }
 
   return json({

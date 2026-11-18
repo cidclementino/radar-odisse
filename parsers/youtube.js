@@ -21,6 +21,7 @@
 //     corretor nem de permuta é ruído demais pra entrar como candidato).
 
 const { generateId } = require('./lib/normalize');
+const { extrairContatos } = require('./lib/contatos');
 
 const FONTE = 'youtube.com';
 const API_KEY = process.env.YOUTUBE_API_KEY;
@@ -58,6 +59,11 @@ const RE_PERMUTA = /(permuta|parceria|incorpora|sociedade)/;
 /** Nome do canal batendo com padrão de corretor/imobiliária. */
 const RE_CANAL_IMOBILIARIO = /(imob|imóve|imove|corretor|realty|construtora|incorporadora)/i;
 
+/** Descrição do canal de quem se apresenta como corretor/imobiliária. */
+const RE_DESCRICAO_CORRETOR = /(creci|corretor|corretora|imobili[aá]ri|consultor imobili|negócios imobili|negocios imobili)/i;
+
+const API = 'https://www.googleapis.com/youtube/v3';
+
 /** Data ISO de N dias atrás — usado como publishedAfter (só vídeos novos desde a última coleta). */
 function diasAtras(n) {
   const d = new Date();
@@ -92,7 +98,7 @@ async function buscarQuery(query, publishedAfter) {
     maxResults: '25',
   });
 
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+  const res = await fetch(`${API}/search?${params}`);
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`YouTube API retornou ${res.status}: ${body.slice(0, 200)}`);
@@ -107,19 +113,52 @@ async function buscarQuery(query, publishedAfter) {
 }
 
 /**
+ * Lê em lote (até 50 ids por chamada, 1 unidade de cota cada) os vídeos ou canais pedidos.
+ * Devolve um Map id -> item. Falha de uma chamada não derruba a coleta: os itens dela ficam de fora
+ * e o vídeo segue com o resumo que veio da busca.
+ */
+async function lerEmLote(recurso, ids, part) {
+  const porId = new Map();
+  const unicos = [...new Set(ids.filter(Boolean))];
+  for (let i = 0; i < unicos.length; i += 50) {
+    const lote = unicos.slice(i, i + 50);
+    const params = new URLSearchParams({ key: API_KEY, part, id: lote.join(','), maxResults: '50' });
+    try {
+      const res = await fetch(`${API}/${recurso}?${params}`);
+      if (!res.ok) throw new Error(`${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const data = await res.json();
+      for (const item of data.items || []) porId.set(item.id, item);
+    } catch (err) {
+      console.error(`[youtube.com] leitura de ${recurso} falhou:`, err.message);
+    }
+  }
+  return porId;
+}
+
+/** Endereço público do canal: o @ quando existe, senão o id. */
+function enderecoCanal(canalId, canal) {
+  const handle = canal?.snippet?.customUrl;
+  if (handle) return `https://www.youtube.com/${handle.startsWith('@') ? handle : `@${handle}`}`;
+  return canalId ? `https://www.youtube.com/channel/${canalId}` : null;
+}
+
+/**
  * Classifica o vídeo em um dos dois níveis de sinal, ou null se for ruído.
+ * Usa a descrição completa do vídeo (videos.list) quando disponível — o resumo da busca
+ * corta a descrição em ~160 caracteres e deixava de fora "permuta" escrito mais abaixo.
  *   - 2 (qualificado): "terreno" + termo explícito de permuta no título/descrição.
  *   - 1 (observação): "terreno" no título/descrição + canal reconhecido como
- *     corretor/imobiliária, mesmo sem termo de permuta.
+ *     corretor/imobiliária (pelo nome ou pela descrição do canal), mesmo sem termo de permuta.
  *   - null: não menciona "terreno", ou menciona mas o canal não é reconhecível
  *     como corretor/imobiliária — ruído demais pra virar candidato.
  */
-function classificarNivel(item) {
-  const texto = `${item.snippet.title} ${item.snippet.description}`.toLowerCase();
+function classificarNivel({ titulo, descricao, canalTitulo, canalDescricao }) {
+  const texto = `${titulo} ${descricao}`.toLowerCase();
   if (!/terreno/.test(texto)) return null;
 
   if (RE_PERMUTA.test(texto)) return 2;
-  if (RE_CANAL_IMOBILIARIO.test(item.snippet.channelTitle || '')) return 1;
+  if (RE_CANAL_IMOBILIARIO.test(canalTitulo || '')) return 1;
+  if (RE_DESCRICAO_CORRETOR.test(canalDescricao || '')) return 1;
   return null;
 }
 
@@ -141,6 +180,7 @@ async function parse() {
   }
 
   const publishedAfter = diasAtras(7);
+  // Cota: cada busca custa 100 unidades; as leituras de vídeos e canais, 1 unidade por lote de 50.
   const oportunidades = [];
   const corretoresCandidatos = [];
 
@@ -149,49 +189,80 @@ async function parse() {
       try {
         const items = await buscarQuery(query, publishedAfter);
 
+        // Descrição completa dos vídeos e descrição dos canais (2 chamadas de 1 unidade cada).
+        const videos = await lerEmLote('videos', items.map(it => it.id.videoId), 'snippet');
+        const canais = await lerEmLote('channels', items.map(it => it.snippet.channelId), 'snippet');
+
+        const lidos = items.map(item => {
+          const videoId = item.id.videoId;
+          const canalId = item.snippet.channelId || null;
+          const video = videos.get(videoId);
+          const canal = canais.get(canalId);
+          return {
+            item, videoId, canalId, canal,
+            titulo: item.snippet.title,
+            descricao: video?.snippet?.description ?? item.snippet.description ?? '',
+            canalTitulo: item.snippet.channelTitle,
+            canalDescricao: canal?.snippet?.description || '',
+          };
+        });
+
         // Diagnóstico: mostra quantos itens a API devolveu e como cada um
         // foi classificado, antes de qualquer descarte. Ajuda a distinguir
         // "a API não retornou o vídeo" de "o filtro descartou o vídeo".
         const contagem = { 2: 0, 1: 0, descartado: 0 };
-        for (const it of items) {
-          const n = classificarNivel(it);
+        for (const l of lidos) {
+          const n = classificarNivel(l);
           contagem[n === null ? 'descartado' : n]++;
         }
         console.log(
           `[youtube.com] "${query}": API retornou ${items.length} item(ns) — ` +
-          `nível 2: ${contagem[2]}, nível 1: ${contagem[1]}, descartado: ${contagem.descartado}`
+          `nível 2: ${contagem[2]}, nível 1: ${contagem[1]}, descartado: ${contagem.descartado} ` +
+          `(descrições completas: ${videos.size} vídeos, ${canais.size} canais)`
         );
 
-        for (const item of items) {
-          const nivel = classificarNivel(item);
+        for (const l of lidos) {
+          const nivel = classificarNivel(l);
           if (nivel === null) continue;
 
-          const videoId = item.id.videoId;
+          const { item, videoId, canalId, canal } = l;
           const link = `https://www.youtube.com/watch?v=${videoId}`;
-          const canal = item.snippet.channelTitle;
+          const id = generateId(FONTE, link, l.titulo);
+          // Contatos: a descrição do canal (identidade do corretor) tem prioridade sobre a do vídeo.
+          const contatos = extrairContatos(l.canalDescricao, l.descricao);
 
           oportunidades.push({
-            id: generateId(FONTE, link, item.snippet.title),
+            id,
             persona: 'corretor',
             fonte: FONTE,
-            titulo: item.snippet.title,
+            titulo: l.titulo,
             local: grupo.grupo,
             nivel_maturidade: nivel,
             corretor_vinculado_id: null, // resolvido pelo worker na fusão
             link_original: link,
             imagem_url: (() => { const t = item.snippet.thumbnails || {}; return (t.high || t.medium || t.default)?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`; })(),
-            texto_bruto: item.snippet.description.slice(0, 500),
+            texto_bruto: l.descricao.slice(0, 2000),
             publicado_em: item.snippet.publishedAt?.slice(0, 10) || null,
             coletado_em: new Date().toISOString(),
             status_interno: 'monitorando',
           });
 
+          const fotos = canal?.snippet?.thumbnails || {};
           corretoresCandidatos.push({
-            nome: canal,
-            empresa: canal,
-            creci: null,
+            nome: l.canalTitulo,
+            empresa: l.canalTitulo,
+            creci: contatos.creci,
             regiao: grupo.grupo,
             fonte: FONTE,
+            oportunidade_id: id,
+            nivel,
+            canal_id: canalId,
+            canal_url: enderecoCanal(canalId, canal),
+            foto_url: (fotos.medium || fotos.default)?.url || null,
+            whatsapp: contatos.whatsapp,
+            telefone: contatos.telefone,
+            instagram: contatos.instagram,
+            email: contatos.email,
           });
         }
       } catch (err) {

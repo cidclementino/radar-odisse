@@ -131,7 +131,7 @@ troco por apartamento
 ## YouTube — rotação de queries por dia/região
 
 5 grupos, um por dia útil — isola falha de uma Action a um grupo, não ao
-vetor inteiro. Consome no máximo 3 buscas/dia (cota de 100/dia sobra folgada).
+vetor inteiro. Consome no máximo 3 buscas/dia (cota diária de 10.000 unidades sobra folgada; ver seção da descrição completa).
 
 | Dia | Grupo | Queries |
 |---|---|---|
@@ -193,14 +193,33 @@ markup, mas é bem provável que precise de ajuste fino assim que rodar contra
 o HTML real pela primeira vez — comparar a saída de
 `npm run parse:olx` / `npm run parse:zap` contra o que aparece no navegador.
 
+## YouTube: descrição completa e contatos (nov/2026)
+
+A busca (`search.list`, 100 unidades) devolve só um resumo da descrição (~160 caracteres) e, do
+canal, só o nome. Por isso cada busca é seguida de duas leituras em lote (1 unidade cada, até 50
+ids): `videos.list` (descrição completa) e `channels.list` (descrição do canal, @, foto).
+
+- **Nível** passa a ser calculado sobre a descrição completa. O canal também conta como
+  corretor/imobiliária quando a descrição dele fala em CRECI, corretor ou imobiliária.
+- **Contatos** (`parsers/lib/contatos.js`): WhatsApp (link wa.me ou celular), telefone fixo,
+  Instagram, e-mail e CRECI, lidos da descrição do canal e, no que faltar, da do vídeo. Só o que
+  está escrito; ausência = null. Telefones em `+55DDNÚMERO`; CRECI como `PB-12345[-J]`.
+- **Corretor** ganha `canal_id`, `canal_url`, `foto_url`, `whatsapp`, `telefone`, `instagram`,
+  `email`. A fusão tenta primeiro o **id do canal** (exato); dois canais diferentes nunca são
+  fundidos por nome ou empresa parecidos. A coleta só preenche campos vazios, nunca sobrescreve.
+- **Ligação oportunidade ↔ corretor**: cada candidato traz `oportunidade_id` (YouTube e ZAP); o
+  Worker preenche `corretor_vinculado_id` na oportunidade e `oportunidades_vinculadas` no corretor.
+  Antes ninguém preenchia esses campos.
+- **Recoleta** de uma oportunidade que já existe mantém a situação decidida no painel e a data da
+  primeira coleta (antes voltava a "monitorando").
+- Testes: `npm test` (`testes/terrenos.test.js`).
+
+Próximo passo: ver `universo-radar-funil` no projeto Universo (edição manual, "Levar aos
+Contatos", "Enviar ao funil").
+
 ## Pendências que restam
 
-- [ ] Criar chave de API do YouTube Data API v3 (Google Cloud Console) e
-      armazenar como GitHub Secret `YOUTUBE_API_KEY` — ação do Cid.
-- [ ] Configurar `RADAR_WORKER_URL` e `RADAR_COLLECT_SECRET` nos secrets do
-      Actions (mesmos já usados por Concursos, reaproveitados).
-- [ ] Publicar os 2 namespaces de KV novos (`OPORTUNIDADES`, `CORRETORES`) —
-      `wrangler kv namespace create OPORTUNIDADES` / `CORRETORES`.
+- [x] Chave da YouTube Data API v3 (`YOUTUBE_API_KEY`) — feita.
 - [ ] Validar os parsers de OLX/ZAP contra HTML real (ver ressalva acima) —
       rodar `npm run parse:olx` localmente e comparar contra o navegador.
 - [ ] Decidir o que entra em "sites especializados" (categoria ainda aberta).

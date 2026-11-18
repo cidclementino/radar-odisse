@@ -11,7 +11,8 @@
     "parse:competitionsarchi": "node parsers/competitionsarchi.js",
     "parse:olx": "node parsers/olx.js",
     "parse:zap": "node parsers/zap.js",
-    "parse:youtube": "node parsers/youtube.js"
+    "parse:youtube": "node parsers/youtube.js",
+    "test": "node --test testes/*.test.js"
   },
   "keywords": [],
   "author": "Odisse Estúdio de Arquitetura e Design",

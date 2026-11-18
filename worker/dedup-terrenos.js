@@ -57,22 +57,33 @@ function bateTexto(a, b) {
  * Retorna o Corretor casado, ou null se nenhum bateu (cria um novo).
  */
 function encontrarCorretor(existentes, candidato) {
+  // 0. Canal do YouTube: identidade exata, vale antes de tudo.
+  if (candidato.canal_id) {
+    const porCanal = existentes.find(c => c.canal_id === candidato.canal_id);
+    if (porCanal) return porCanal;
+  }
+  // Dois canais diferentes nunca são o mesmo corretor por semelhança de nome ou empresa.
+  const compativeis = existentes.filter(c => !(candidato.canal_id && c.canal_id && c.canal_id !== candidato.canal_id));
+
   // 1. Nome
-  const porNome = existentes.find(c => bateTexto(c.nome, candidato.nome));
+  const porNome = compativeis.find(c => bateTexto(c.nome, candidato.nome));
   if (porNome) return porNome;
 
   // 2. CRECI (só se ambos os lados tiverem)
   if (candidato.creci) {
-    const porCreci = existentes.find(c => c.creci && c.creci.toUpperCase() === candidato.creci.toUpperCase());
+    const porCreci = compativeis.find(c => c.creci && c.creci.toUpperCase() === candidato.creci.toUpperCase());
     if (porCreci) return porCreci;
   }
 
   // 3. Empresa
-  const porEmpresa = existentes.find(c => bateTexto(c.empresa, candidato.empresa));
+  const porEmpresa = compativeis.find(c => bateTexto(c.empresa, candidato.empresa));
   if (porEmpresa) return porEmpresa;
 
   return null;
 }
+
+/** Campos de identidade e contato que a coleta preenche quando vazios e nunca sobrescreve. */
+const CAMPOS_COLETADOS = ['canal_id', 'canal_url', 'foto_url', 'whatsapp', 'telefone', 'instagram', 'email'];
 
 /** Cria um Corretor novo a partir de um candidato de qualquer fonte. */
 function criarCorretor(candidato) {
@@ -84,20 +95,26 @@ function criarCorretor(candidato) {
     regioes_atuacao: candidato.regiao ? [candidato.regiao] : [],
     volume_zap: candidato.fonte === 'zapimoveis.com.br' ? 1 : 0,
     descoberto_via: [candidato.fonte],
-    nivel_maturidade: 1,
+    nivel_maturidade: candidato.nivel || 1,
     oportunidades_vinculadas: [],
+    ...Object.fromEntries(CAMPOS_COLETADOS.map(k => [k, candidato[k] ?? null])),
     atualizado_em: new Date().toISOString(),
   };
 }
 
 /** Funde um candidato num Corretor já existente — preenche gaps, nunca sobrescreve. */
 function fundirCorretor(existente, candidato) {
-  const preencher = (a, b) => (a === null || a === undefined ? b : a);
+  const preencher = (a, b) => (a === null || a === undefined ? (b ?? null) : a);
   const regioes = new Set(existente.regioes_atuacao || []);
   if (candidato.regiao) regioes.add(candidato.regiao);
 
+  const coletados = Object.fromEntries(CAMPOS_COLETADOS.map(k => [k, preencher(existente[k], candidato[k] ?? null)]));
+
   return {
     ...existente,
+    ...coletados,
+    // o nível do corretor sobe com o sinal mais forte já visto; nunca desce sozinho
+    nivel_maturidade: Math.max(existente.nivel_maturidade || 1, candidato.nivel || 1),
     empresa: preencher(existente.empresa, candidato.empresa),
     creci: preencher(existente.creci, candidato.creci),
     regioes_atuacao: [...regioes],
@@ -109,24 +126,37 @@ function fundirCorretor(existente, candidato) {
 
 /**
  * Processa uma lista de candidatos a Corretor contra os já existentes no KV.
- * Retorna { corretoresAtualizados } — um Map id -> Corretor pronto pra gravar.
+ * Retorna { corretores, vinculos }:
+ *   - corretores: Map id -> Corretor pronto pra gravar (só os tocados nesta coleta);
+ *   - vinculos: Map id da oportunidade -> id do corretor (candidatos que vieram de um anúncio/vídeo).
  */
 function processarCandidatosCorretor(existentes, candidatos) {
   const porId = new Map(existentes.map(c => [c.id, { ...c }]));
+  const tocados = new Set();
+  const vinculos = new Map();
 
   for (const candidato of candidatos) {
     const listaAtual = [...porId.values()];
     const match = encontrarCorretor(listaAtual, candidato);
 
+    let corretor;
     if (match) {
-      porId.set(match.id, fundirCorretor(match, candidato));
+      corretor = fundirCorretor(match, candidato);
     } else {
-      const novo = criarCorretor(candidato);
-      porId.set(novo.id, novo);
+      corretor = criarCorretor(candidato);
     }
+    if (candidato.oportunidade_id) {
+      const ligadas = new Set(corretor.oportunidades_vinculadas || []);
+      ligadas.add(candidato.oportunidade_id);
+      corretor.oportunidades_vinculadas = [...ligadas];
+      vinculos.set(candidato.oportunidade_id, corretor.id);
+    }
+    porId.set(corretor.id, corretor);
+    tocados.add(corretor.id);
   }
 
-  return porId;
+  const corretores = new Map([...tocados].map(id => [id, porId.get(id)]));
+  return { corretores, vinculos };
 }
 
 module.exports = { encontrarCorretor, criarCorretor, fundirCorretor, processarCandidatosCorretor, similarity };

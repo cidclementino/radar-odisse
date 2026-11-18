@@ -53,6 +53,10 @@ O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os ar
 
 ## Interface
 
+- **Versão dos arquivos:** antes de cada commit que mexe em `css/` ou `js/`, rode
+  `python3 tools/versionar.py`. Ele põe `?v=<hash>` nos endereços dos arquivos nas páginas, para o
+  navegador nunca misturar arquivo novo com arquivo velho guardado.
+
 - **Revisão (`revisao.html`):** a fila de pares parecidos que a coleta não juntou sozinha. Para cada
   par: juntar (escolhendo, nos campos diferentes, se fica o valor novo), incluir o novo como concurso
   próprio ou incluir já arquivado. Usa `POST /api/revisao/resolver` no Worker. Quem foi juntado fica

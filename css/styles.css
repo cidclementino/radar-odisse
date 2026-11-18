@@ -322,8 +322,10 @@ a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline
 .pendencia__usar { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--tinta-2); cursor: pointer; }
 .pendencia__acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linha); }
 
+/* banner do par: altura fixa, recortado — banners verticais não podem esticar a tabela */
+.pendencia__tabela thead th { vertical-align: bottom; }
 .pendencia__banner {
-  display: block; width: 100%; max-width: 220px; aspect-ratio: 16 / 10; object-fit: cover;
+  display: block; width: 100%; max-width: 240px; height: 120px; object-fit: cover; object-position: center;
   border-radius: 4px; background: var(--nevoa); border: 1px solid var(--linha); margin-bottom: 8px;
 }
 
@@ -350,11 +352,7 @@ a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline
 .concurso__selos .selecionar {
   pointer-events: auto; width: 26px; height: 26px; border-radius: var(--raio-p);
   background: rgba(255,255,255,.92); box-shadow: 0 1px 2px rgba(46,48,54,.18);
-  opacity: 0; transition: opacity .12s;
 }
-.concurso:hover .selecionar, .concurso.is-selecionado .selecionar, .concurso .selecionar:focus-within,
-.grade.tem-selecao .selecionar { opacity: 1; }
-@media (hover: none) { .concurso__selos .selecionar { opacity: 1; } }
 .concurso.is-selecionado { border-color: var(--tinta); outline: 2px solid var(--tinta); outline-offset: -1px; }
 .linha.is-selecionado { background: var(--veu); }
 .col-sel { width: 36px; padding-right: 0 !important; }
@@ -380,7 +378,7 @@ a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline
 .fusao__fechar { border: 0; background: none; font-size: 22px; line-height: 1; color: var(--tinta-2); cursor: pointer; padding: 2px 6px; }
 .fusao__corpo { padding: 16px 18px; overflow-y: auto; }
 .fusao__lados { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.fusao__banner { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--raio-p); background: var(--nevoa); border: 1px solid var(--linha); }
+.fusao__banner { display: block; width: 100%; aspect-ratio: 16 / 9; max-height: 220px; object-fit: cover; border-radius: var(--raio-p); background: var(--nevoa); border: 1px solid var(--linha); }
 .fusao__nome { font-weight: 650; font-size: 14px; margin: 10px 0 2px; line-height: 1.3; }
 .fusao__lado .u-apoio { margin: 0; }
 .fusao__instrucao { font-size: 13px; font-weight: 600; margin: 0 0 8px; }

@@ -439,6 +439,14 @@ async function handleFundirConcursos(request, env) {
   for (const campo of usar_absorvido) CAMPOS_FUSAO_MANUAL[campo]?.(fundido, absorver);
   fundido.fontes = [...new Set([...(manter.fontes || [manter.fonte]), ...(absorver.fontes || [absorver.fonte])].filter(Boolean))];
   fundido.ids_fundidos = [...new Set([...(manter.ids_fundidos || []), absorver.id, ...(absorver.ids_fundidos || [])])];
+  // A situação mais avançada dos dois vence (inscrito > acompanhando > monitorando > arquivado):
+  // antes ficava sempre a do `manter`, e um concurso em acompanhamento saía dele ao ser fundido.
+  // A leitura do site oficial (`acompanhamento`) vem junto de quem tiver.
+  const ORDEM_SITUACAO = ['descartado', 'monitorando', 'acompanhando', 'inscrito'];
+  const peso = c => ORDEM_SITUACAO.indexOf(c.status_interno || 'monitorando');
+  if (peso(absorver) > peso(manter)) fundido.status_interno = absorver.status_interno;
+  if (!fundido.acompanhamento?.lido_em && absorver.acompanhamento?.lido_em) fundido.acompanhamento = absorver.acompanhamento;
+  else if (!fundido.acompanhamento && absorver.acompanhamento) fundido.acompanhamento = absorver.acompanhamento;
   // fica a primeira captura, para a etiqueta "Novo" não reaparecer
   const coletas = [manter.coletado_em, absorver.coletado_em].filter(Boolean).sort();
   if (coletas.length) fundido.coletado_em = coletas[0];

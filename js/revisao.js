@@ -79,6 +79,12 @@ function celula(campo, c) {
   return escapeHTML(v);
 }
 
+function bannerDe(c) {
+  return c.imagem_url
+    ? `<img class="pendencia__banner" src="${escapeHTML(c.imagem_url)}" alt="" loading="lazy" decoding="async">`
+    : '<span class="pendencia__banner"></span>';
+}
+
 function renderPendencia(p) {
   const ex = p.candidato_existente;
   const nv = p.candidato_novo;
@@ -105,7 +111,9 @@ function renderPendencia(p) {
       <span class="u-apoio">Na fila desde ${formatarData(p.criado_em)}</span>
     </header>
     <div class="tabela-rolagem"><table class="u-tabela pendencia__tabela">
-      <thead><tr><th></th><th>Já no Radar</th><th>Encontrado na coleta</th></tr></thead>
+      <thead><tr><th></th>
+        <th>${bannerDe(ex)}Já no Radar</th>
+        <th>${bannerDe(nv)}Encontrado na coleta</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table></div>
     <div class="pendencia__acoes">
@@ -169,6 +177,7 @@ function renderLote() {
 }
 
 function render() {
+  cacheGravar('revisao', pendencias); // o contador na página de Concursos lê daqui
   const lista = document.getElementById('pendencias');
   const comIndicio = new Set(pendencias.filter(temIndicio).map(p => p.candidato_novo.id));
   // primeiro os pares com indício (prováveis duplicados), depois o resto; mais antigos antes

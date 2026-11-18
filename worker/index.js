@@ -11,6 +11,7 @@
 //   GET    /api/concursos          -> lista todos os Concursos (usado pelo front-end estático)
 //   GET    /api/revisao            -> lista pendências de revisão manual (página revisao.html)
 //   POST   /api/revisao/resolver   -> resolve uma pendência: funde no existente ou cria como concurso próprio
+//   POST   /api/concursos/fundir   -> funde dois concursos já cadastrados (seleção manual na página)
 //   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
 //   PATCH  /api/concursos/:id      -> atualiza status_interno e/ou apelido de um Concurso (ex: descartar/restaurar, renomear exibição)
 //   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
@@ -242,6 +243,68 @@ async function handleResolverPendencia(request, env) {
   return json({ ok: true, acao, concurso: resultado, pendencias_removidas: removidas.length });
 }
 
+// Campos que a fusão manual pode tirar do concurso absorvido (escolha feita no popup da página).
+const CAMPOS_FUSAO_MANUAL = {
+  apelido: (a, b) => { a.apelido = b.apelido || b.nome; },
+  nome: (a, b) => { a.nome = b.nome; },
+  imagem_url: (a, b) => { a.imagem_url = b.imagem_url; },
+  local_projeto: (a, b) => { a.local_projeto = b.local_projeto; },
+  promotor: (a, b) => { a.promotor = b.promotor; },
+  destinado_a: (a, b) => { a.destinado_a = b.destinado_a; },
+  premio: (a, b) => { a.premio = b.premio; },
+  link_oficial: (a, b) => { a.link_oficial = b.link_oficial; },
+  tipo: (a, b) => { a.tipo = b.tipo; },
+  escopo: (a, b) => { a.escopo = b.escopo; },
+  inscricao: (a, b) => { a.inscricao = b.inscricao; },
+  inscricao_fim: (a, b) => { a.datas = { ...a.datas, inscricao_fim: b.datas?.inscricao_fim ?? null }; },
+  entrega_fim: (a, b) => { a.datas = { ...a.datas, entrega_fim: b.datas?.entrega_fim ?? null }; },
+};
+
+/**
+ * POST /api/concursos/fundir — junta dois concursos que já estão no Radar (duplicado que passou
+ * pela coleta). Corpo: { manter_id, absorver_id, usar_absorvido: [campos] }.
+ * O `manter` fica com o id; fundir() completa o que falta nele com o `absorver` e soma as fontes;
+ * os campos listados em `usar_absorvido` passam a ter o valor do absorvido. O id do absorvido vai
+ * para `ids_fundidos` (a próxima coleta o reconhece) e ele é apagado. Pendências de revisão que
+ * apontavam para o absorvido saem da fila — na coleta seguinte, se ainda fizer sentido, voltam
+ * comparadas com o concurso fundido.
+ */
+async function handleFundirConcursos(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'corpo inválido — esperado JSON' }, 400); }
+  const { manter_id, absorver_id, usar_absorvido = [] } = body || {};
+  if (!manter_id || !absorver_id || manter_id === absorver_id) {
+    return json({ error: 'envie manter_id e absorver_id (diferentes)' }, 400);
+  }
+  const [manter, absorver] = await Promise.all([
+    env.CONCURSOS.get(manter_id, 'json'),
+    env.CONCURSOS.get(absorver_id, 'json'),
+  ]);
+  if (!manter || !absorver) return json({ error: 'um dos concursos não está mais no Radar' }, 404);
+
+  const fundido = fundir(manter, absorver);
+  for (const campo of usar_absorvido) CAMPOS_FUSAO_MANUAL[campo]?.(fundido, absorver);
+  fundido.fontes = [...new Set([...(manter.fontes || [manter.fonte]), ...(absorver.fontes || [absorver.fonte])].filter(Boolean))];
+  fundido.ids_fundidos = [...new Set([...(manter.ids_fundidos || []), absorver.id, ...(absorver.ids_fundidos || [])])];
+  // fica a primeira captura, para a etiqueta "Novo" não reaparecer
+  const coletas = [manter.coletado_em, absorver.coletado_em].filter(Boolean).sort();
+  if (coletas.length) fundido.coletado_em = coletas[0];
+  fundido.atualizado_em = new Date().toISOString();
+
+  await env.CONCURSOS.put(fundido.id, JSON.stringify(fundido));
+  await env.CONCURSOS.delete(absorver.id);
+
+  let removidas = 0;
+  let cursor;
+  do {
+    const page = await env.REVISAO.list({ prefix: `${absorver.id}__`, cursor });
+    for (const k of page.keys) { await env.REVISAO.delete(k.name); removidas++; }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  return json({ ok: true, concurso: fundido, removido_id: absorver.id, pendencias_removidas: removidas });
+}
+
 async function handleCollectTerrenos(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth !== `Bearer ${env.COLLECT_SECRET}`) {
@@ -288,6 +351,10 @@ export default {
 
     if (request.method === 'GET' && url.pathname === '/api/revisao') {
       return json(await listAll(env.REVISAO));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/concursos/fundir') {
+      return handleFundirConcursos(request, env);
     }
 
     if (request.method === 'POST' && url.pathname === '/api/revisao/resolver') {

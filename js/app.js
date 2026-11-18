@@ -275,7 +275,7 @@ function renderCard(c) {
   const arquivado = c.status_interno === 'descartado';
 
   const el = document.createElement('article');
-  el.className = `concurso concurso--${urgencia(dias, encerrado)}${arquivado || encerrado ? ' is-apagado' : ''}`;
+  el.className = `concurso concurso--${urgencia(dias, encerrado)}${arquivado || encerrado ? ' is-apagado' : ''}${selecionados.has(c.id) ? ' is-selecionado' : ''}`;
   el.tabIndex = 0;
   el.setAttribute('role', 'button');
 
@@ -288,7 +288,10 @@ function renderCard(c) {
   el.innerHTML = `
     ${banner}
     <div class="concurso__selos">
-      ${ehNovo(c) ? '<span class="u-etiqueta selo-novo">Novo</span>' : '<span></span>'}
+      <span class="concurso__selos-esq">
+        <label class="selecionar" title="Selecionar para fundir"><input type="checkbox" class="js-sel" data-id="${escapeHTML(c.id)}"${selecionados.has(c.id) ? ' checked' : ''} aria-label="Selecionar ${escapeHTML(nomeExibido(c))}"></label>
+        ${ehNovo(c) ? '<span class="u-etiqueta selo-novo">Novo</span>' : ''}
+      </span>
       ${situacao ? `<span class="u-etiqueta">${escapeHTML(situacao)}</span>` : ''}
     </div>
     <div class="concurso__corpo">
@@ -322,6 +325,7 @@ function renderCard(c) {
 // ---------------------------------------------------------------- vista: lista
 
 const COLUNAS = [
+  { id: 'sel', rotulo: '', ordena: false, classe: 'col-sel' },
   { id: 'nome', rotulo: 'Concurso' },
   { id: 'local', rotulo: 'Local' },
   { id: 'escopo', rotulo: 'Escopo', classe: 'col-media' },
@@ -364,9 +368,10 @@ function renderLista(itens) {
     const dias = diasAte(c.datas?.inscricao_fim);
     const encerrado = estaEncerrado(dias);
     const tr = document.createElement('tr');
-    tr.className = `linha linha--${urgencia(dias, encerrado)}${c.status_interno === 'descartado' || encerrado ? ' is-apagado' : ''}`;
+    tr.className = `linha linha--${urgencia(dias, encerrado)}${c.status_interno === 'descartado' || encerrado ? ' is-apagado' : ''}${selecionados.has(c.id) ? ' is-selecionado' : ''}`;
     tr.tabIndex = 0;
     tr.innerHTML = `
+      <td class="col-sel"><label class="selecionar" title="Selecionar para fundir"><input type="checkbox" class="js-sel" data-id="${escapeHTML(c.id)}"${selecionados.has(c.id) ? ' checked' : ''} aria-label="Selecionar ${escapeHTML(nomeExibido(c))}"></label></td>
       <td><div class="linha__concurso">
         ${c.imagem_url ? `<img class="linha__banner" src="${escapeHTML(c.imagem_url)}" alt="" loading="lazy" decoding="async">` : '<span class="linha__banner"></span>'}
         <div><div class="linha__titulo"><span class="js-nome">${escapeHTML(nomeExibido(c))}</span>${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
@@ -402,6 +407,148 @@ function renderLista(itens) {
   }
 
   ligarOrdenacao(lista.querySelector('table'), ordem, () => { prefGravar('concursos:ordem', ordem); render(); });
+}
+
+// ---------------------------------------------------------------- seleção e fusão manual
+//
+// Dois concursos marcados → "Fundir os dois" → popup com os banners e, campo a campo, o que é
+// diferente entre eles para escolher qual valor fica. O que só um dos dois tem entra sozinho.
+
+const selecionados = new Set();
+
+function ligarSelecao() {
+  // um único ouvinte para cartões e linhas; marcar a caixa não abre nem fecha o item
+  document.querySelector('main').addEventListener('click', e => {
+    if (e.target.closest('.selecionar')) e.stopPropagation();
+  }, true);
+  document.querySelector('main').addEventListener('change', e => {
+    const caixa = e.target.closest('.js-sel');
+    if (!caixa) return;
+    const id = caixa.dataset.id;
+    if (caixa.checked) selecionados.add(id); else selecionados.delete(id);
+    caixa.closest('.concurso, .linha')?.classList.toggle('is-selecionado', caixa.checked);
+    renderSelecao();
+  });
+  document.getElementById('selecao-limpar').addEventListener('click', () => {
+    selecionados.clear();
+    render();
+  });
+  document.getElementById('selecao-fundir').addEventListener('click', abrirFusao);
+}
+
+function renderSelecao() {
+  for (const id of [...selecionados]) if (!concursosState.some(c => c.id === id)) selecionados.delete(id);
+  const n = selecionados.size;
+  document.getElementById('selecao').hidden = n === 0;
+  document.getElementById('selecao-texto').textContent =
+    n === 2 ? '2 concursos selecionados' : n === 1 ? '1 selecionado · marque outro para fundir' : `${n} selecionados · fundir junta dois de cada vez`;
+  document.getElementById('selecao-fundir').disabled = n !== 2;
+  document.getElementById('stack').classList.toggle('tem-selecao', n > 0);
+}
+
+const CAMPOS_FUSAO = [
+  { id: 'apelido', rotulo: 'Nome exibido', valor: c => nomeExibido(c) },
+  { id: 'local_projeto', rotulo: 'Local', valor: c => c.local_projeto },
+  { id: 'promotor', rotulo: 'Promotor', valor: c => c.promotor },
+  { id: 'inscricao_fim', rotulo: 'Fim das inscrições', valor: c => c.datas?.inscricao_fim, texto: v => formatarData(v) },
+  { id: 'entrega_fim', rotulo: 'Entrega do projeto', valor: c => c.datas?.entrega_fim, texto: v => formatarData(v) },
+  { id: 'link_oficial', rotulo: 'Site oficial', valor: c => c.link_oficial, link: true },
+  { id: 'inscricao', rotulo: 'Inscrição', valor: c => inscricaoTexto(c) },
+  { id: 'premio', rotulo: 'Prêmio', valor: c => c.premio },
+  { id: 'destinado_a', rotulo: 'Destinado a', valor: c => c.destinado_a },
+  { id: 'tipo', rotulo: 'Abrangência', valor: c => c.tipo, texto: v => (v === 'nacional' ? 'Nacional' : v === 'internacional' ? 'Internacional' : v) },
+  { id: 'escopo', rotulo: 'Escopo', valor: c => ((c.escopo || []).length ? (c.escopo || []).map(e => ESCOPO_LABELS[e] || e).join(', ') : null) },
+];
+
+const vazio = v => v === null || v === undefined || v === '';
+const igual = (a, b) => normalizar(a).replace(/\s+/g, ' ').trim() === normalizar(b).replace(/\s+/g, ' ').trim();
+
+function textoCampo(campo, v) {
+  if (vazio(v)) return '<span class="u-apoio">—</span>';
+  const t = campo.texto ? campo.texto(v) : v;
+  if (campo.link) return `<a href="${escapeHTML(v)}" target="_blank" rel="noopener">${escapeHTML(String(v).replace(/^https?:\/\/(www\.)?/, '').slice(0, 48))}</a>`;
+  return escapeHTML(t);
+}
+
+function abrirFusao() {
+  if (selecionados.size !== 2) return;
+  // fica o id do que foi coletado primeiro; o outro é absorvido
+  const [a, b] = [...selecionados].map(id => concursosState.find(c => c.id === id))
+    .sort((x, y) => comparar(x.coletado_em, y.coletado_em, 'asc'));
+  const dialogo = document.getElementById('fusao');
+
+  const diferentes = CAMPOS_FUSAO.filter(f => !vazio(f.valor(a)) && !vazio(f.valor(b)) && !igual(f.valor(a), f.valor(b)));
+  const soNoB = CAMPOS_FUSAO.filter(f => vazio(f.valor(a)) && !vazio(f.valor(b)));
+  const bannerDiferente = a.imagem_url && b.imagem_url && a.imagem_url !== b.imagem_url;
+
+  const coluna = (c, lado) => {
+    const img = c.imagem_url
+      ? `<img src="${escapeHTML(c.imagem_url)}" alt="" class="fusao__banner">`
+      : '<div class="fusao__banner"></div>';
+    const banner = bannerDiferente
+      ? `<label class="fusao__opcao fusao__opcao--banner"><input type="radio" name="f-imagem_url" value="${lado}"${lado === 'a' ? ' checked' : ''}>${img}<span>Usar este banner</span></label>`
+      : img;
+    return `<div class="fusao__lado">
+      ${banner}
+      <p class="fusao__nome">${escapeHTML(nomeExibido(c))}</p>
+      <p class="u-apoio">${escapeHTML(fontesDe(c).join(', '))} · coletado ${formatarData(c.coletado_em)}</p>
+    </div>`;
+  };
+
+  dialogo.innerHTML = `
+    <form method="dialog" class="fusao__form">
+      <header class="fusao__topo">
+        <h2 id="fusao-titulo">Fundir dois concursos</h2>
+        <button type="button" class="fusao__fechar js-cancelar" aria-label="Fechar">×</button>
+      </header>
+      <div class="fusao__corpo">
+        <div class="fusao__lados">${coluna(a, 'a')}${coluna(b, 'b')}</div>
+        ${diferentes.length ? `
+          <p class="fusao__instrucao">Escolha o valor que fica em cada campo diferente:</p>
+          <table class="u-tabela fusao__tabela"><tbody>
+            ${diferentes.map(f => `<tr>
+              <th scope="row">${escapeHTML(f.rotulo)}</th>
+              ${['a', 'b'].map(lado => `<td><label class="fusao__opcao"><input type="radio" name="f-${f.id}" value="${lado}"${lado === 'a' ? ' checked' : ''}><span>${textoCampo(f, f.valor(lado === 'a' ? a : b))}</span></label></td>`).join('')}
+            </tr>`).join('')}
+          </tbody></table>`
+        : '<p class="fusao__instrucao">Nenhum campo diferente entre os dois.</p>'}
+        <p class="u-apoio fusao__nota">${soNoB.length ? `Vêm do segundo, porque só ele tem: ${soNoB.map(f => f.rotulo.toLowerCase()).join(', ')}. ` : ''}As fontes dos dois ficam juntas, o segundo deixa de aparecer como concurso separado e as próximas coletas reconhecem os dois como um só.</p>
+      </div>
+      <footer class="fusao__rodape">
+        <button type="button" class="u-botao js-cancelar">Cancelar</button>
+        <button type="submit" class="u-botao forte js-confirmar">Fundir</button>
+      </footer>
+    </form>`;
+
+  dialogo.querySelectorAll('.js-cancelar').forEach(btn => btn.addEventListener('click', () => dialogo.close()));
+  dialogo.querySelector('form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const usar = [...dialogo.querySelectorAll('input[type=radio]:checked')]
+      .filter(r => r.value === 'b').map(r => r.name.replace(/^f-/, ''));
+    const botao = dialogo.querySelector('.js-confirmar');
+    botao.disabled = true;
+    botao.textContent = 'Fundindo…';
+    try {
+      const res = await fetch(`${WORKER}/api/concursos/fundir`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ manter_id: a.id, absorver_id: b.id, usar_absorvido: usar }),
+      });
+      const corpo = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(corpo.error || `Worker respondeu ${res.status}`);
+      concursosState = concursosState.filter(c => c.id !== b.id);
+      substituir(corpo.concurso);
+      selecionados.clear();
+      abertoId = null;
+      dialogo.close();
+      render();
+    } catch (err) {
+      console.error(err);
+      botao.disabled = false;
+      botao.textContent = 'Fundir';
+      alert(`Não foi possível fundir agora: ${err.message}`);
+    }
+  });
+  dialogo.showModal();
 }
 
 // ---------------------------------------------------------------- tela
@@ -449,6 +596,18 @@ function render() {
   document.getElementById('f-limpar').hidden = !filtrosAtivos();
   renderResumo(visiveis);
   renderAtualizado();
+  renderSelecao();
+}
+
+// quantos concursos esperam decisão na Revisão (conta concursos novos, não pares)
+function mostrarContadorRevisao(pendencias) {
+  const n = new Set((pendencias || []).map(p => p.candidato_novo?.id)).size;
+  const el = document.getElementById('contador-revisao');
+  el.textContent = n;
+  el.hidden = n === 0;
+  document.getElementById('link-revisao').title = n
+    ? `${plural(n, 'concurso esperando decisão', 'concursos esperando decisão')}`
+    : 'Nenhuma pendência de revisão';
 }
 
 function receber(dados) {
@@ -460,7 +619,9 @@ function receber(dados) {
 function init() {
   vistaAtual = ligarVista(document.getElementById('vista'), 'concursos:vista', render);
   ligarFiltros();
+  ligarSelecao();
   atualizarOpcoesFiltros();
+  carregarComCache('revisao', `${WORKER}/api/revisao`, mostrarContadorRevisao);
 
   if (!cacheLer(CACHE_CHAVE)) document.getElementById('resumo').textContent = 'Carregando concursos…';
   carregarComCache(CACHE_CHAVE, DATA_URL, receber);

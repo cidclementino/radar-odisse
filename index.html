@@ -22,6 +22,7 @@
         <button type="button" data-vista="cartoes">Cartões</button>
         <button type="button" data-vista="lista">Lista</button>
       </div>
+      <a class="subnav" href="revisao.html" id="link-revisao" title="Concursos parecidos que a coleta não juntou sozinha">Revisão<span class="contador" id="contador-revisao" hidden></span></a>
       <div class="pagina__estado">
         <span class="atualizado" id="updated-at"></span>
         <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
@@ -65,6 +66,14 @@
     <div class="lista" id="lista" aria-live="polite" hidden></div>
     <p class="vazio" id="empty-state" hidden>Nenhum concurso com esses filtros.</p>
   </main>
+
+  <div class="selecao" id="selecao" hidden>
+    <span id="selecao-texto"></span>
+    <button type="button" class="u-botao forte" id="selecao-fundir">Fundir os dois</button>
+    <button type="button" class="filtros__limpar" id="selecao-limpar">Limpar seleção</button>
+  </div>
+
+  <dialog class="fusao" id="fusao" aria-labelledby="fusao-titulo"></dialog>
 
   <script src="js/comum.js"></script>
   <script src="js/app.js"></script>

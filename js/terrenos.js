@@ -154,8 +154,10 @@ function renderListaOp(itens) {
   const ordenados = [...itens].sort((a, b) => comparar(f(a), f(b), ordemOp.direcao) || comparar(VALOR_OP.coletado(a), VALOR_OP.coletado(b), 'desc'));
   lista.innerHTML = `<div class="tabela-rolagem"><table class="u-tabela tabela">${theadOrdenavel(COLUNAS_OP, ordemOp)}<tbody>${ordenados.map(o => `
     <tr class="linha linha--nivel-${o.nivel_maturidade}${STATUS_OCULTOS.has(o.status_interno) ? ' is-apagado' : ''}"${o.corretor_vinculado_id ? ` data-corretor-id="${escapeHTML(o.corretor_vinculado_id)}"` : ''}>
-      <td><a class="linha__titulo" href="${escapeHTML(o.link_original)}" target="_blank" rel="noopener">${escapeHTML(o.titulo)}</a>
-        ${STATUS_OCULTOS.has(o.status_interno) ? `<div class="u-apoio">${escapeHTML(STATUS_LABELS[o.status_interno])}</div>` : ''}</td>
+      <td><div class="linha__concurso">
+        ${miniaturaDe(o) ? `<img class="linha__banner" src="${escapeHTML(miniaturaDe(o))}" alt="" loading="lazy" decoding="async">` : '<span class="linha__banner"></span>'}
+        <div><a class="linha__titulo" href="${escapeHTML(o.link_original)}" target="_blank" rel="noopener">${escapeHTML(o.titulo)}</a>
+        ${STATUS_OCULTOS.has(o.status_interno) ? `<div class="u-apoio">${escapeHTML(STATUS_LABELS[o.status_interno])}</div>` : ''}</div></div></td>
       <td class="col-media">${etiquetaNivel(o.nivel_maturidade, true)}</td>
       <td class="col-media">${escapeHTML(PERSONA_LABELS[o.persona] || o.persona || '')}</td>
       <td>${escapeHTML(o.local || '')}</td>
@@ -164,6 +166,7 @@ function renderListaOp(itens) {
       <td class="col-num">${formatarData(o.coletado_em)}</td>
       <td class="col-larga js-corretor">${escapeHTML(corretoresPorId[o.corretor_vinculado_id]?.nome || '')}</td>
     </tr>`).join('')}</tbody></table></div>`;
+  lista.querySelectorAll('img.linha__banner').forEach(img => img.addEventListener('error', () => img.removeAttribute('src'), { once: true }));
   ligarOrdenacao(lista.querySelector('table'), ordemOp, () => { prefGravar('terrenos:ordem', ordemOp); renderOportunidades(); });
 }
 

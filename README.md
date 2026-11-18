@@ -53,6 +53,11 @@ O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os ar
 
 ## Interface
 
+- **Revisão (`revisao.html`):** a fila de pares parecidos que a coleta não juntou sozinha. Para cada
+  par: juntar (escolhendo, nos campos diferentes, se fica o valor novo), incluir o novo como concurso
+  próprio ou incluir já arquivado. Usa `POST /api/revisao/resolver` no Worker. Quem foi juntado fica
+  em `ids_fundidos` e a coleta seguinte já o reconhece, sem voltar para a fila.
+
 - **Marca e Universo:** as páginas usam `marca.odisse.com.br/v1/marca.css` (cores, Inter) e
   `universo.odisse.com.br/base/v1/universo.css` (botões, campos, tabela, etiquetas), com a mesma
   barra das outras ferramentas internas (selo, logotipo, "Radar", seções e o menu "Universo" de
@@ -70,6 +75,11 @@ O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os ar
   carregamento lê todas as chaves de um namespace).
 
 ## Publicando o Worker
+
+O workflow `worker.yml` publica `worker/` sozinho a cada mudança no `main` (Worker `radar-odisse`).
+Precisa dos secrets `CLOUDFLARE_API_TOKEN` (Workers Scripts e Workers KV Storage: Edit) e
+`CLOUDFLARE_ACCOUNT_ID` neste repositório. O passo a passo manual abaixo continua valendo.
+
 
 ```bash
 cd worker

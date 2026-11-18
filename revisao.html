@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Revisão — Radar Odisse</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
+<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="u-pagina">
+
+  <header class="topo" data-pagina="revisao"></header>
+
+  <main class="pagina pagina--estreita">
+    <div class="pagina__barra">
+      <h1>Revisão de concursos</h1>
+      <div class="pagina__estado">
+        <button type="button" class="u-botao" id="recarregar">Recarregar</button>
+      </div>
+    </div>
+    <p class="pagina__intro">A coleta encontrou concursos parecidos com outros que já estão no Radar, mas com algum dado diferente. Enquanto não forem resolvidos, eles não aparecem na lista de concursos. Para cada par, diga se é o mesmo concurso ou se são diferentes.</p>
+
+    <p class="aviso" id="aviso" hidden></p>
+    <div class="lote" id="lote" hidden></div>
+    <p class="resumo" id="resumo">Carregando pendências…</p>
+    <div class="pendencias" id="pendencias"></div>
+    <p class="vazio" id="vazio" hidden>Nenhuma pendência. Tudo o que a coleta encontrou já está no Radar.</p>
+  </main>
+
+  <script src="js/comum.js"></script>
+  <script src="js/revisao.js"></script>
+</body>
+</html>

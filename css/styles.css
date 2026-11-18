@@ -286,3 +286,37 @@ a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline
 
 /* colunas secundárias somem em telas estreitas */
 @media (max-width: 1100px) { .col-larga { display: none; } .tabela { min-width: 640px; } }
+
+/* ---------------------------------------------------------------- revisão */
+
+.pagina--estreita { max-width: 1100px; }
+
+.lote {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  background: var(--elevada); border: 1px solid var(--linha); border-left: 3px solid var(--destaque);
+  border-radius: var(--raio); padding: 14px 16px; margin-bottom: 20px; font-size: 13px;
+}
+.lote p { margin: 0; flex: 1 1 420px; line-height: 1.5; color: var(--tinta-2); }
+.lote strong { color: var(--tinta); font-weight: 600; }
+
+.pendencias { display: flex; flex-direction: column; gap: 16px; }
+.pendencia {
+  background: var(--elevada); border: 1px solid var(--linha); border-radius: var(--raio);
+  box-shadow: inset 3px 0 0 var(--neutro); padding: 14px 16px 16px;
+}
+.pendencia--indicio { box-shadow: inset 3px 0 0 var(--media); }
+.pendencia__topo { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.pendencia .tabela-rolagem { border: 0; border-radius: 0; background: none; }
+.pendencia__tabela { min-width: 620px; table-layout: fixed; }
+.pendencia__tabela th:first-child { width: 170px; }
+.pendencia__tabela tbody th { font-weight: 600; text-align: left; vertical-align: top; }
+.pendencia__tabela td { vertical-align: top; overflow-wrap: anywhere; }
+.pendencia__tabela tbody tr:hover { background: none; }
+.pendencia__estado { display: block; font-size: 11px; font-weight: 500; color: var(--tinta-3); margin-top: 2px; }
+.pendencia__tabela tr.estado-conflito th .pendencia__estado { color: var(--perigo); }
+.pendencia__tabela tr.estado-bate th .pendencia__estado { color: var(--ok); }
+.pendencia__tabela tr.estado-conflito td { background: rgba(164, 71, 59, 0.05); }
+.pendencia__tabela tr.estado-info th, .pendencia__tabela tr.estado-info td { color: var(--tinta-2); font-size: 12.5px; }
+.pendencia__tabela a { color: var(--destaque-texto); }
+.pendencia__usar { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--tinta-2); cursor: pointer; }
+.pendencia__acoes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--linha); }

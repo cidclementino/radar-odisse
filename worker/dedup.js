@@ -17,6 +17,8 @@ const CANDIDATO_THRESHOLD = 0.5;
 function normalizeText(str) {
   if (!str) return '';
   return str
+    // selo de data que o competitions.archi às vezes cola no título ("16 09 Pavilion Atlas 2026")
+    .replace(/^\s*(\d{1,2}\s+){2}(?=\S)/, '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -128,6 +130,25 @@ function fundir(existente, candidato) {
 }
 
 /**
+ * Quando um par com conflito merece ir para a revisão manual (em vez de entrar como concurso novo).
+ *
+ * FIX (nov/2026): o pré-filtro de 50% no nome deixa passar pares sem relação nenhuma, porque os nomes
+ * desses concursos repetem as mesmas palavras ("Design Awards 2027", "Architecture Competition").
+ * Com a regra antiga, qualquer um desses pares com conflito ia para a revisão — e o concurso novo
+ * ficava escondido lá. A fila chegou a 78 pendências, 50 delas sem nenhum campo batendo.
+ *
+ * Agora só vai para revisão quem tem indício real de ser o mesmo concurso:
+ *   - o nome bate (≥ 80%), ou
+ *   - pelo menos dois campos fortes batem: fim da inscrição, entrega, domínio do link oficial.
+ * `local_projeto` sozinho não conta: "Online", "Concept" e "Global" se repetem em dezenas de concursos.
+ */
+function indicioDeMesmoConcurso(classificacoes) {
+  if (classificacoes.nome === 'bate') return true;
+  const fortes = ['inscricao_fim', 'entrega_fim', 'link_oficial'].filter(k => classificacoes[k] === 'bate').length;
+  return fortes >= 2;
+}
+
+/**
  * Ponto de entrada usado pelo worker: recebe os Concursos já existentes no KV
  * e os candidatos brutos vindos de um parser, retorna a ação a tomar pra cada um.
  *
@@ -175,8 +196,9 @@ function classificarConcursos(existentes, candidatos) {
   }
 
   for (const candidato of candidatos) {
-    // Dedup nível 1 (mesma fonte, mesmo link+título): id já bate exatamente.
-    const idxIgualPorId = pool.findIndex(e => e.id === candidato.id);
+    // Dedup nível 1 (mesma fonte, mesmo link+título): id já bate exatamente — ou o candidato já
+    // foi declarado "o mesmo concurso" na revisão manual (`ids_fundidos`, ver resolverPendencia).
+    const idxIgualPorId = pool.findIndex(e => e.id === candidato.id || (e.ids_fundidos || []).includes(candidato.id));
     if (idxIgualPorId !== -1) {
       aplicarResultado(idxIgualPorId, fundir(pool[idxIgualPorId], candidato));
       continue;
@@ -202,7 +224,7 @@ function classificarConcursos(existentes, candidatos) {
         if (!melhorFusao || quantosBatem > melhorFusao.quantosBatem) {
           melhorFusao = { existente, idx, quantosBatem };
         }
-      } else if (!melhorFusao) {
+      } else if (!melhorFusao && indicioDeMesmoConcurso(classificacoes)) {
         if (!melhorRevisao || quantosBatem > melhorRevisao.quantosBatem) {
           melhorRevisao = { existente, quantosBatem, classificacoes };
         }
@@ -227,4 +249,4 @@ function classificarConcursos(existentes, candidatos) {
   return { fundidos, novos, pendentes_revisao };
 }
 
-export { classificarConcursos, comparar, fundir, similarity, normalizeText };
+export { classificarConcursos, comparar, fundir, similarity, normalizeText, indicioDeMesmoConcurso };

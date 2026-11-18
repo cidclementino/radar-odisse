@@ -9,7 +9,8 @@
 //
 // Rotas:
 //   GET    /api/concursos          -> lista todos os Concursos (usado pelo front-end estático)
-//   GET    /api/revisao            -> lista pendências de revisão manual (fase 2 da UI)
+//   GET    /api/revisao            -> lista pendências de revisão manual (página revisao.html)
+//   POST   /api/revisao/resolver   -> resolve uma pendência: funde no existente ou cria como concurso próprio
 //   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
 //   PATCH  /api/concursos/:id      -> atualiza status_interno e/ou apelido de um Concurso (ex: descartar/restaurar, renomear exibição)
 //   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
@@ -26,7 +27,7 @@
 // segredo próprio de UI — nunca reaproveitar o COLLECT_SECRET aqui, pois
 // ele ficaria exposto no JS público do front-end).
 
-import { classificarConcursos } from './dedup.js';
+import { classificarConcursos, fundir } from './dedup.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 
 const CORS_HEADERS = {
@@ -162,6 +163,85 @@ async function handleDeleteConcurso(env, id) {
   return json({ deletado: true, id });
 }
 
+// Campos que a revisão pode trocar pelo valor do concurso novo (os mesmos 5 da comparação).
+const CAMPOS_REVISAO = {
+  nome: (alvo, novo) => { alvo.nome = novo.nome; },
+  local_projeto: (alvo, novo) => { alvo.local_projeto = novo.local_projeto; },
+  inscricao_fim: (alvo, novo) => { alvo.datas = { ...alvo.datas, inscricao_fim: novo.datas?.inscricao_fim ?? null }; },
+  entrega_fim: (alvo, novo) => { alvo.datas = { ...alvo.datas, entrega_fim: novo.datas?.entrega_fim ?? null }; },
+  link_oficial: (alvo, novo) => { alvo.link_oficial = novo.link_oficial; },
+};
+
+/**
+ * POST /api/revisao/resolver — decide uma pendência da fila de revisão.
+ *
+ * Corpo: { existente_id, novo_id, acao, usar_novo? }
+ *   acao 'fundir'    -> é o mesmo concurso: o novo entra no existente (fundir() preenche o que
+ *                       falta; `usar_novo` lista os campos em conflito em que o valor novo vence).
+ *                       O id do novo vai para `ids_fundidos`, para a próxima coleta reconhecê-lo
+ *                       direto (nível 1 do dedup) em vez de recriar a pendência.
+ *   acao 'separar'   -> são concursos diferentes: o novo entra como concurso próprio.
+ *   acao 'arquivar'  -> diferente, mas sem interesse: entra já arquivado (some da lista ativa e
+ *                       não volta para a fila nas próximas coletas).
+ * Em todos os casos a pendência sai da fila, junto com outras pendências do mesmo concurso novo.
+ * Sem autenticação, como PATCH/DELETE (ver nota de segurança no topo).
+ */
+async function handleResolverPendencia(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'corpo inválido — esperado JSON' }, 400); }
+  const { existente_id, novo_id, acao, usar_novo = [] } = body || {};
+  if (!existente_id || !novo_id || !['fundir', 'separar', 'arquivar'].includes(acao)) {
+    return json({ error: 'envie existente_id, novo_id e acao (fundir | separar | arquivar)' }, 400);
+  }
+
+  const chave = `${existente_id}__${novo_id}`;
+  const pendencia = await env.REVISAO.get(chave, 'json');
+  if (!pendencia) return json({ error: 'pendência não encontrada (já resolvida?)' }, 404);
+  const novo = pendencia.candidato_novo;
+  const agora = new Date().toISOString();
+  let resultado;
+
+  if (acao === 'fundir') {
+    // usa a versão atual do existente (pode ter mudado desde que a pendência foi criada)
+    const existente = await env.CONCURSOS.get(existente_id, 'json');
+    if (!existente) return json({ error: 'o concurso existente não está mais no Radar — use "separar"' }, 409);
+    const fundido = fundir(existente, novo);
+    for (const campo of usar_novo) CAMPOS_REVISAO[campo]?.(fundido, novo);
+    fundido.ids_fundidos = [...new Set([...(existente.ids_fundidos || []), novo.id])];
+    fundido.atualizado_em = agora;
+    await env.CONCURSOS.put(fundido.id, JSON.stringify(fundido));
+    resultado = fundido;
+  } else {
+    const jaExiste = await env.CONCURSOS.get(novo.id, 'json');
+    const item = jaExiste || {
+      ...novo,
+      apelido: novo.apelido || novo.nome,
+      status_interno: acao === 'arquivar' ? 'descartado' : (novo.status_interno || 'monitorando'),
+      coletado_em: novo.coletado_em || agora,
+    };
+    if (jaExiste && acao === 'arquivar') item.status_interno = 'descartado';
+    item.atualizado_em = agora;
+    await env.CONCURSOS.put(item.id, JSON.stringify(item));
+    resultado = item;
+  }
+
+  // tira da fila esta e qualquer outra pendência do mesmo concurso novo
+  const removidas = [];
+  let cursor;
+  do {
+    const page = await env.REVISAO.list({ cursor });
+    for (const k of page.keys) {
+      if (k.name === chave || k.name.endsWith(`__${novo_id}`)) {
+        await env.REVISAO.delete(k.name);
+        removidas.push(k.name);
+      }
+    }
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  return json({ ok: true, acao, concurso: resultado, pendencias_removidas: removidas.length });
+}
+
 async function handleCollectTerrenos(request, env) {
   const auth = request.headers.get('Authorization') || '';
   if (auth !== `Bearer ${env.COLLECT_SECRET}`) {
@@ -208,6 +288,10 @@ export default {
 
     if (request.method === 'GET' && url.pathname === '/api/revisao') {
       return json(await listAll(env.REVISAO));
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/revisao/resolver') {
+      return handleResolverPendencia(request, env);
     }
 
     if (request.method === 'POST' && url.pathname === '/api/collect') {

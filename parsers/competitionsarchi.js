@@ -228,8 +228,21 @@ function escolherTitulo($, anchors, textoBloco) {
 
   const idx = textoBloco.search(/Submission:/i);
   if (idx <= 0) return null;
-  const candidato = textoBloco.slice(0, idx).trim();
+  const candidato = textoBloco.slice(0, idx).trim().replace(/\s+/g, ' ');
   return candidato || null;
+}
+
+/**
+ * Tira do começo do título o selo de data do card ("16 09 Pavilion Atlas 2026" → "Pavilion Atlas
+ * 2026"). Nos cards em destaque o site mostra dia e mês num selo antes do título, e o fallback de
+ * escolherTitulo pega esse texto junto. Só o `nome` é limpo: o `id` continua calculado com o título
+ * como veio, para os concursos já gravados não virarem duplicados.
+ */
+function limparTitulo(titulo) {
+  return String(titulo || '')
+    .replace(/\s+/g, ' ')
+    .replace(/^(\d{1,2}\s+){2}(?=\S)/, '')
+    .trim();
 }
 
 /** Busca uma página de listagem e devolve os itens "crus" (sem link oficial, sem categories reais ainda). */
@@ -394,7 +407,7 @@ async function parse(idsConhecidos = new Set()) {
 
     concursos.push({
       id,
-      nome: item.titulo,
+      nome: limparTitulo(item.titulo),
       promotor: null, // não estruturado nem na listagem nem no detalhe — revisão manual
       local_projeto: normalizarLocal(item.location),
       destinado_a: item.type || null,

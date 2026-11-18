@@ -17,6 +17,7 @@ const WORKER = 'https://radar-odisse.reservaprojectbasework.workers.dev';
   const SECOES = [
     { id: 'concursos', nome: 'Concursos', href: 'index.html' },
     { id: 'terrenos', nome: 'Terrenos', href: 'terrenos.html' },
+    { id: 'revisao', nome: 'Revisão', href: 'revisao.html' },
   ];
   raiz.innerHTML = `
     <a class="topo__casa" href="index.html" title="Radar">

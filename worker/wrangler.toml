@@ -1,4 +1,4 @@
-name = "radar-odisse-worker"
+name = "radar-odisse" # mesmo nome do Worker publicado (radar-odisse.reservaprojectbasework.workers.dev)
 main = "index.js"
 compatibility_date = "2026-07-01"
 

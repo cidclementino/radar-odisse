@@ -24,3 +24,12 @@ jobs:
           WORKER_URL: ${{ secrets.RADAR_WORKER_URL }}
           COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
         run: node scripts/collect-and-send.js
+
+      # Lê os sites oficiais para preencher banner e prazos que faltam e atualizar os concursos em
+      # acompanhamento. Não derruba a coleta se algum site falhar.
+      - name: Completar concursos pelos sites oficiais
+        if: always()
+        env:
+          WORKER_URL: ${{ secrets.RADAR_WORKER_URL }}
+          COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
+        run: node scripts/completar-concursos.js

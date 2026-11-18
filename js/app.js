@@ -7,7 +7,8 @@ const DATA_URL = `${WORKER}/api/concursos`;
 const CONCURSO_URL = id => `${WORKER}/api/concursos/${encodeURIComponent(id)}`;
 const CACHE_CHAVE = 'concursos';
 
-const STATUS_LABELS = { monitorando: 'Monitorando', descartado: 'Arquivado', inscrito: 'Inscrito' };
+const STATUS_LABELS = { monitorando: 'Monitorando', acompanhando: 'Acompanhando', inscrito: 'Inscrito', descartado: 'Arquivado' };
+const ACOMPANHADO = new Set(['acompanhando', 'inscrito']);
 
 const ESCOPO_LABELS = {
   arquitetura: 'Arquitetura',
@@ -169,6 +170,7 @@ function substituir(atualizado) {
   const i = concursosState.findIndex(c => c.id === atualizado.id);
   if (i !== -1) concursosState[i] = atualizado;
   cacheGravar(CACHE_CHAVE, concursosState);
+  atualizarContadores();
 }
 
 function remover(id) {
@@ -264,6 +266,35 @@ function ligarDetalhe(raiz, c) {
   });
 }
 
+// ---------------------------------------------------------------- situação e acompanhamento
+
+/** muda a situação; ao entrar em acompanhamento, lê o site oficial em segundo plano */
+async function mudarSituacao(c, novo) {
+  if (novo === c.status_interno) return true;
+  const atualizado = await patchConcurso(c.id, { status_interno: novo }, 'Não foi possível mudar a situação agora. Tente de novo em instantes.');
+  if (!atualizado) return false;
+  substituir(atualizado);
+  render();
+  if (ACOMPANHADO.has(novo) && !atualizado.acompanhamento?.lido_em) {
+    notificar(`Lendo o site oficial de “${nomeExibido(atualizado)}”…`, { ms: 0 });
+    try {
+      const lido = await lerSiteOficial(atualizado);
+      if (lido) {
+        substituir(lido);
+        render();
+        notificar(lido.acompanhamento?.erro
+          ? `Não deu para ler o site oficial (${lido.acompanhamento.erro}). O concurso está em Acompanhamento mesmo assim.`
+          : 'Pronto: as informações do site oficial estão em Acompanhamento.', { erro: !!lido.acompanhamento?.erro, ms: 7000 });
+      }
+    } catch (err) {
+      notificar(`Não deu para ler o site oficial: ${err.message}`, { erro: true, ms: 7000 });
+    }
+  } else if (novo === 'acompanhando') {
+    notificar('Concurso em Acompanhamento.');
+  }
+  return true;
+}
+
 // O item aberto continua aberto quando a tela é redesenhada (ex.: depois de mudar um filtro).
 let abertoId = null;
 
@@ -302,6 +333,7 @@ function renderCard(c) {
     <div class="concurso__prazo">
       <span class="concurso__dias">${!encerrado && dias !== null ? dias : '—'}</span>
       <span class="concurso__prazo-texto">${textoPrazo(dias, encerrado)}${!encerrado && dias !== null ? ` · ${formatarData(c.datas.inscricao_fim, { curta: true })}` : ''}</span>
+      <button type="button" class="acompanhar js-acompanhar${ACOMPANHADO.has(c.status_interno) ? ' is-ativo' : ''}" title="${ACOMPANHADO.has(c.status_interno) ? 'Em acompanhamento — clique para voltar ao monitoramento geral' : 'Acompanhar: lê o site oficial e leva o concurso para a página Acompanhamento'}">${ACOMPANHADO.has(c.status_interno) ? (c.status_interno === 'inscrito' ? 'Inscrito' : 'Acompanhando') : 'Acompanhar'}</button>
     </div>
     ${renderDetalhe(c)}`;
 
@@ -316,6 +348,15 @@ function renderCard(c) {
   if (abertoId === c.id) { el.classList.add('is-aberto'); el.setAttribute('aria-expanded', 'true'); }
   el.addEventListener('click', alternar);
   el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+  const botaoAcomp = el.querySelector('.js-acompanhar');
+  botaoAcomp.addEventListener('click', async e => {
+    e.stopPropagation();
+    if (c.status_interno === 'inscrito') { location.href = 'acompanhamento.html'; return; }
+    botaoAcomp.disabled = true;
+    await mudarSituacao(c, c.status_interno === 'acompanhando' ? 'monitorando' : 'acompanhando');
+    botaoAcomp.disabled = false;
+  });
+  botaoAcomp.addEventListener('keydown', e => e.stopPropagation());
   // imagem que não carrega vira o mesmo fundo neutro dos concursos sem banner
   el.querySelector('img.concurso__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
   ligarDetalhe(el, c);
@@ -351,6 +392,14 @@ const VALOR_ORDEM = {
   situacao: c => situacaoTexto(c),
 };
 
+function seletorSituacao(c, encerrado) {
+  const op = (v, r) => `<option value="${v}"${c.status_interno === v ? ' selected' : ''}>${r}</option>`;
+  return `<select class="situacao js-situacao situacao--${escapeHTML(c.status_interno)}" aria-label="Situação de ${escapeHTML(nomeExibido(c))}">
+      ${op('monitorando', 'Monitorando')}${op('acompanhando', 'Acompanhando')}${op('inscrito', 'Inscrito')}${op('descartado', 'Arquivado')}
+      <option disabled>──────</option><option value="excluir">Excluir…</option>
+    </select>${encerrado ? '<div class="u-apoio">inscrições encerradas</div>' : ''}`;
+}
+
 function situacaoTexto(c) {
   if (estaEncerrado(diasAte(c.datas?.inscricao_fim))) return 'Encerrado';
   return STATUS_LABELS[c.status_interno] || c.status_interno;
@@ -383,7 +432,7 @@ function renderLista(itens) {
       <td class="col-num"><span class="dias">${!encerrado && dias !== null ? dias : '—'}</span></td>
       <td class="col-num col-larga">${formatarData(c.datas?.entrega_fim) || '<span class="u-apoio">—</span>'}</td>
       <td class="col-larga">${escapeHTML(inscricaoTexto(c) || '')}</td>
-      <td class="col-media">${escapeHTML(situacaoTexto(c))}</td>`;
+      <td class="col-media col-situacao">${seletorSituacao(c, encerrado)}</td>`;
 
     const det = document.createElement('tr');
     det.className = 'linha-detalhe';
@@ -399,8 +448,24 @@ function renderLista(itens) {
       tr.classList.toggle('is-aberto', abrir);
       abertoId = abrir ? c.id : null;
     };
-    tr.addEventListener('click', alternar);
-    tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+    tr.addEventListener('click', e => { if (!e.target.closest('.col-situacao')) alternar(); });
+    tr.addEventListener('keydown', e => { if (e.target.closest('.col-situacao')) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+    const sel = tr.querySelector('.js-situacao');
+    sel.addEventListener('change', async () => {
+      const valor = sel.value;
+      sel.disabled = true;
+      if (valor === 'excluir') {
+        if (confirm(`Apagar definitivamente "${nomeExibido(c)}"? Essa ação não pode ser desfeita.`) && await apagarConcurso(c.id)) {
+          remover(c.id);
+          render();
+          return;
+        }
+        sel.value = c.status_interno;
+        sel.disabled = false;
+        return;
+      }
+      if (!(await mudarSituacao(c, valor))) { sel.value = c.status_interno; sel.disabled = false; }
+    });
     tr.querySelector('img.linha__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
     ligarDetalhe(det, c);
     tbody.append(tr, det);
@@ -599,21 +664,11 @@ function render() {
   renderSelecao();
 }
 
-// quantos concursos esperam decisão na Revisão (conta concursos novos, não pares)
-function mostrarContadorRevisao(pendencias) {
-  const n = new Set((pendencias || []).map(p => p.candidato_novo?.id)).size;
-  const el = document.getElementById('contador-revisao');
-  el.textContent = n;
-  el.hidden = n === 0;
-  document.getElementById('link-revisao').title = n
-    ? `${plural(n, 'concurso esperando decisão', 'concursos esperando decisão')}`
-    : 'Nenhuma pendência de revisão';
-}
-
 function receber(dados) {
   concursosState = Array.isArray(dados) ? dados : [];
   atualizarOpcoesFiltros();
   render();
+  atualizarContadores();
 }
 
 function init() {
@@ -621,7 +676,7 @@ function init() {
   ligarFiltros();
   ligarSelecao();
   atualizarOpcoesFiltros();
-  carregarComCache('revisao', `${WORKER}/api/revisao`, mostrarContadorRevisao);
+  montarSubnav('geral');
 
   if (!cacheLer(CACHE_CHAVE)) document.getElementById('resumo').textContent = 'Carregando concursos…';
   carregarComCache(CACHE_CHAVE, DATA_URL, receber);

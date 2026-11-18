@@ -12,6 +12,9 @@
 //   GET    /api/revisao            -> lista pendências de revisão manual (página revisao.html)
 //   POST   /api/revisao/resolver   -> resolve uma pendência: funde no existente ou cria como concurso próprio
 //   POST   /api/concursos/fundir   -> funde dois concursos já cadastrados (seleção manual na página)
+//   GET    /api/concursos/:id/site?url=  -> devolve o HTML do site oficial do concurso (só do mesmo domínio)
+//   POST   /api/manutencao/reparar -> conserta datas a partir de texto_bruto (Authorization: Bearer <secret>)
+//   POST   /api/manutencao/completar -> preenche campos vazios e o acompanhamento de uma leva (idem)
 //   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
 //   PATCH  /api/concursos/:id      -> atualiza status_interno e/ou apelido de um Concurso (ex: descartar/restaurar, renomear exibição)
 //   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
@@ -29,6 +32,7 @@
 // ele ficaria exposto no JS público do front-end).
 
 import { classificarConcursos, fundir } from './dedup.js';
+import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 
 const CORS_HEADERS = {
@@ -37,7 +41,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-const STATUS_VALIDOS = new Set(['monitorando', 'descartado', 'inscrito']);
+// 'acompanhando' = monitoramento específico: o site oficial é lido e o concurso vai para a página Acompanhamento
+const STATUS_VALIDOS = new Set(['monitorando', 'acompanhando', 'inscrito', 'descartado']);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -125,8 +130,8 @@ async function handlePatchConcurso(request, env, id) {
   }
   body = body || {};
 
-  if (!('status_interno' in body) && !('apelido' in body)) {
-    return json({ error: 'nada pra atualizar — envie status_interno e/ou apelido' }, 400);
+  if (!('status_interno' in body) && !('apelido' in body) && !('acompanhamento' in body) && !('completar' in body)) {
+    return json({ error: 'nada pra atualizar — envie status_interno, apelido, acompanhamento ou completar' }, 400);
   }
 
   const atualizado = { ...existente, atualizado_em: new Date().toISOString() };
@@ -146,9 +151,135 @@ async function handlePatchConcurso(request, env, id) {
     atualizado.apelido = apelido;
   }
 
+  if ('acompanhamento' in body) {
+    const erro = validarAcompanhamento(body.acompanhamento);
+    if (erro) return json({ error: erro }, 400);
+    atualizado.acompanhamento = body.acompanhamento;
+  }
+
+  if ('completar' in body) aplicarCompletar(atualizado, body.completar);
+
   await env.CONCURSOS.put(id, JSON.stringify(atualizado));
 
   return json(atualizado);
+}
+
+// ---------------------------------------------------------------- site oficial e completar
+
+// O que veio da leitura do site oficial (js/extrair-site.js) fica em `acompanhamento.site`.
+// Limite de tamanho para ninguém encher o KV por esta rota aberta.
+function validarAcompanhamento(a) {
+  if (a === null) return null;
+  if (typeof a !== 'object' || Array.isArray(a)) return 'acompanhamento deve ser um objeto';
+  if (JSON.stringify(a).length > 60000) return 'acompanhamento grande demais';
+  return null;
+}
+
+// Preenche só o que está vazio — nunca troca um valor que já existe.
+function aplicarCompletar(alvo, campos) {
+  if (!campos || typeof campos !== 'object') return alvo;
+  const vazio = v => v === null || v === undefined || v === '';
+  const texto = v => (typeof v === 'string' && v.trim() && v.length < 2000 ? v.trim() : null);
+  if (vazio(alvo.imagem_url) && texto(campos.imagem_url) && /^https?:\/\//.test(campos.imagem_url)) alvo.imagem_url = campos.imagem_url.trim();
+  for (const k of ['local_projeto', 'promotor', 'premio', 'descricao']) {
+    if (vazio(alvo[k]) && texto(campos[k])) alvo[k] = texto(campos[k]);
+  }
+  alvo.datas = { ...(alvo.datas || {}) };
+  for (const k of ['inscricao_fim', 'entrega_fim', 'resultado_previsto']) {
+    if (!dataValida(alvo.datas[k]) && dataValida(campos[k])) alvo.datas[k] = campos[k];
+  }
+  return alvo;
+}
+
+/**
+ * GET /api/concursos/:id/site?url= — busca uma página do site oficial e devolve o HTML, para a
+ * página de Acompanhamento ler (o navegador não pode buscar sites de outros domínios direto).
+ * Só aceita endereços do mesmo domínio do link oficial (ou da publicação na fonte) do concurso,
+ * para não virar um proxy aberto. O HTML passa direto, sem ser processado aqui (o plano gratuito
+ * da Cloudflare dá só 10 ms de processamento por pedido).
+ */
+async function handleSiteOficial(env, id, alvo) {
+  const c = await env.CONCURSOS.get(id, 'json');
+  if (!c) return json({ error: 'concurso não encontrado' }, 404);
+  const base = c.link_oficial || c.fonte_url_original;
+  if (!base) return json({ error: 'concurso sem link oficial' }, 422);
+  let destino;
+  try {
+    destino = new URL(alvo || base);
+    const host = h => h.replace(/^www\./, '').toLowerCase();
+    if (!/^https?:$/.test(destino.protocol) || host(destino.hostname) !== host(new URL(base).hostname)) {
+      return json({ error: 'endereço fora do site oficial do concurso' }, 400);
+    }
+  } catch {
+    return json({ error: 'endereço inválido' }, 400);
+  }
+  let res;
+  try {
+    res = await fetch(destino.href, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en,pt-BR;q=0.8',
+      },
+    });
+  } catch (err) {
+    return json({ error: `não foi possível abrir o site: ${err.message}` }, 502);
+  }
+  const tipo = res.headers.get('content-type') || '';
+  if (!/html|xml|text\/plain/i.test(tipo)) return json({ error: `o site respondeu com ${tipo || 'conteúdo desconhecido'}, não uma página` }, 415);
+  return new Response(res.body, {
+    status: res.ok ? 200 : 502,
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      'X-Site-Status': String(res.status),
+      'X-Site-Url': res.url,
+      'Access-Control-Expose-Headers': 'X-Site-Status, X-Site-Url',
+      ...CORS_HEADERS,
+    },
+  });
+}
+
+function autorizado(request, env) {
+  return (request.headers.get('Authorization') || '') === `Bearer ${env.COLLECT_SECRET}`;
+}
+
+/** POST /api/manutencao/reparar — conserta as datas de todos os concursos a partir de texto_bruto. */
+async function handleReparar(request, env) {
+  if (!autorizado(request, env)) return json({ error: 'não autorizado' }, 401);
+  const todos = await listAll(env.CONCURSOS);
+  const consertados = [];
+  for (const c of todos) {
+    const novo = repararDatas(c);
+    if (novo) {
+      await env.CONCURSOS.put(novo.id, JSON.stringify({ ...novo, atualizado_em: new Date().toISOString() }));
+      consertados.push(novo.id);
+    }
+  }
+  return json({ concursos: todos.length, consertados: consertados.length });
+}
+
+/**
+ * POST /api/manutencao/completar — recebe { itens: [{ id, campos?, acompanhamento? }] } da coleta
+ * (scripts/completar-concursos.js, que lê os sites oficiais). Preenche só campos vazios; o
+ * acompanhamento é substituído. Marca `completado_em` para a coleta não tentar de novo toda semana.
+ */
+async function handleCompletar(request, env) {
+  if (!autorizado(request, env)) return json({ error: 'não autorizado' }, 401);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'corpo inválido' }, 400); }
+  const itens = Array.isArray(body?.itens) ? body.itens.slice(0, 40) : [];
+  let gravados = 0;
+  for (const item of itens) {
+    const c = item?.id && await env.CONCURSOS.get(item.id, 'json');
+    if (!c) continue;
+    const atualizado = aplicarCompletar({ ...c }, item.campos);
+    if (item.acompanhamento !== undefined && !validarAcompanhamento(item.acompanhamento)) atualizado.acompanhamento = item.acompanhamento;
+    atualizado.completado_em = new Date().toISOString();
+    await env.CONCURSOS.put(c.id, JSON.stringify(atualizado));
+    gravados++;
+  }
+  return json({ recebidos: itens.length, gravados });
 }
 
 /**
@@ -363,6 +494,19 @@ export default {
 
     if (request.method === 'POST' && url.pathname === '/api/collect') {
       return handleCollect(request, env);
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/manutencao/reparar') {
+      return handleReparar(request, env);
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/manutencao/completar') {
+      return handleCompletar(request, env);
+    }
+
+    const matchSite = url.pathname.match(/^\/api\/concursos\/([^/]+)\/site$/);
+    if (request.method === 'GET' && matchSite) {
+      return handleSiteOficial(env, decodeURIComponent(matchSite[1]), url.searchParams.get('url'));
     }
 
     // Rotas /api/concursos/:id — checadas antes do GET genérico de cima

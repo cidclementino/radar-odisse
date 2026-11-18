@@ -226,3 +226,55 @@ function comparar(a, b, direcao) {
   const r = typeof a === 'number' && typeof b === 'number' ? a - b : String(a).localeCompare(String(b), 'pt-BR', { sensitivity: 'base' });
   return direcao === 'asc' ? r : -r;
 }
+
+// ---------------------------------------------------------------- submenu de Concursos
+//
+// Concursos tem três páginas: o monitoramento geral (index.html), o acompanhamento específico
+// (acompanhamento.html) e a revisão de duplicados (revisao.html). Os números vêm das cópias
+// guardadas no navegador; a fila de revisão é buscada (com cache) para o contador.
+
+function montarSubnav(atual) {
+  const nav = document.getElementById('subnav');
+  if (!nav) return;
+  const ABAS = [
+    { id: 'geral', nome: 'Monitoramento geral', href: 'index.html' },
+    { id: 'acompanhamento', nome: 'Acompanhamento', href: 'acompanhamento.html', contador: 'contador-acompanhamento' },
+    { id: 'revisao', nome: 'Revisão', href: 'revisao.html', contador: 'contador-revisao' },
+  ];
+  nav.innerHTML = ABAS.map(a => `<a href="${a.href}"${a.id === atual ? ' class="is-atual" aria-current="page"' : ''}>${a.nome}${a.contador ? `<span class="contador" id="${a.contador}" hidden></span>` : ''}</a>`).join('');
+  atualizarContadores();
+  if (atual !== 'revisao') carregarComCache('revisao', `${WORKER}/api/revisao`, () => atualizarContadores());
+}
+
+function atualizarContadores() {
+  const pintar = (id, n, titulo) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n;
+    el.hidden = !n;
+    el.parentElement.title = titulo;
+  };
+  const conc = cacheLer('concursos')?.dados || [];
+  const acomp = conc.filter(c => ['acompanhando', 'inscrito'].includes(c.status_interno)).length;
+  pintar('contador-acompanhamento', acomp, acomp ? plural(acomp, 'concurso em acompanhamento', 'concursos em acompanhamento') : 'Nenhum concurso em acompanhamento');
+  const rev = new Set((cacheLer('revisao')?.dados || []).map(p => p.candidato_novo?.id)).size;
+  pintar('contador-revisao', rev, rev ? plural(rev, 'concurso esperando decisão', 'concursos esperando decisão') : 'Nenhuma pendência de revisão');
+}
+
+// ---------------------------------------------------------------- aviso passageiro
+
+function notificar(texto, { erro = false, ms = 4500 } = {}) {
+  let el = document.getElementById('notificacao');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'notificacao';
+    el.className = 'notificacao';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = texto;
+  el.classList.toggle('is-erro', erro);
+  el.hidden = false;
+  clearTimeout(el._t);
+  if (ms) el._t = setTimeout(() => { el.hidden = true; }, ms);
+}

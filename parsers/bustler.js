@@ -91,12 +91,31 @@ function extrairDatasBustler(texto) {
   let inscricao_fim = null;
   let entrega_fim = null;
 
+  // 0. Cabeçalho do próprio feed (o formato real, visto em nov/2026):
+  //    "Registration Deadline:  Oct 4, 2026; Submission Deadline: Oct 4, 2026"
+  //    Na página de detalhe: "Register/Submit Deadline:  Sunday, Oct 4, 2026" e "Reg/Sub: Oct 4, 2026".
+  //    Mesma leitura de worker/datas.js (datasDoTexto) — manter as duas em sincronia.
+  const DATA = '(?:[A-Za-z]{3,9},?\\s+)?([A-Za-z]{3,9})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(\\d{4})';
+  const acharCab = re => {
+    const m = texto.match(re);
+    if (!m) return null;
+    const mes = MESES_ABREV_EN[m[1].toLowerCase().slice(0, 3)];
+    return mes ? `${m[3]}-${mes}-${m[2].padStart(2, '0')}` : null;
+  };
+  inscricao_fim = acharCab(new RegExp(`(?:registration|register)(?:\\/submit)?\\s+deadline\\s*:?\\s*${DATA}`, 'i'))
+    || acharCab(new RegExp(`\\breg(?:\\/sub)?\\s*:\\s*${DATA}`, 'i'));
+  entrega_fim = acharCab(new RegExp(`submission\\s+deadline\\s*:?\\s*${DATA}`, 'i'))
+    || acharCab(new RegExp(`\\bsub\\s*:\\s*${DATA}`, 'i'));
+  if (/register\/submit|reg\/sub/i.test(texto)) entrega_fim = entrega_fim || inscricao_fim;
+
   const ordinalRe = '(\\d{1,2})(?:st|nd|rd|th)?,?\\s+(' + Object.keys(MESES_EN).join('|') + ')\\s+(\\d{4})';
-  const mInscOrdinal = texto.match(new RegExp('registration[^.]*?' + ordinalRe, 'i'));
+  const mInscOrdinal = inscricao_fim ? null : texto.match(new RegExp('registration[^.]*?' + ordinalRe, 'i'));
   if (mInscOrdinal) {
     inscricao_fim = `${mInscOrdinal[3]}-${MESES_EN[mInscOrdinal[2].toLowerCase()]}-${mInscOrdinal[1].padStart(2, '0')}`;
   }
-  const mEntOrdinal = texto.match(new RegExp('subm(ission|it)[^.]*?' + ordinalRe, 'i'));
+  // FIX (nov/2026): era 'subm(ission|it)', um grupo de captura a mais que deslocava os índices e
+  // gravava datas como "September-undefined-it".
+  const mEntOrdinal = entrega_fim ? null : texto.match(new RegExp('subm(?:ission|it)[^.]*?' + ordinalRe, 'i'));
   if (mEntOrdinal) {
     entrega_fim = `${mEntOrdinal[3]}-${MESES_EN[mEntOrdinal[2].toLowerCase()]}-${mEntOrdinal[1].padStart(2, '0')}`;
   }
@@ -214,7 +233,7 @@ async function parse() {
   return concursos;
 }
 
-module.exports = { parse, FONTE };
+module.exports = { parse, FONTE, extrairDatasBustler };
 
 // Permite rodar `node parsers/bustler.js` isoladamente pra depuração.
 if (require.main === module) {

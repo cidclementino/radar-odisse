@@ -103,6 +103,9 @@ function comparar(existente, candidato) {
 /** Funde um candidato num existente: preenche campos ausentes, nunca sobrescreve valor já presente. */
 function fundir(existente, candidato) {
   const preencher = (a, b) => (a === null || a === undefined ? b : a);
+  // data quebrada (ex.: "September-undefined-it", de um bug antigo do parser do Bustler) conta como vazia
+  const dataOk = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+  const preencherData = (a, b) => (dataOk(a) ? a : (dataOk(b) ? b : null));
 
   return {
     ...existente,
@@ -119,9 +122,9 @@ function fundir(existente, candidato) {
       obs: preencher(existente.inscricao?.obs, candidato.inscricao?.obs),
     },
     datas: {
-      inscricao_fim: preencher(existente.datas?.inscricao_fim, candidato.datas?.inscricao_fim),
-      entrega_fim: preencher(existente.datas?.entrega_fim, candidato.datas?.entrega_fim),
-      resultado_previsto: preencher(existente.datas?.resultado_previsto, candidato.datas?.resultado_previsto),
+      inscricao_fim: preencherData(existente.datas?.inscricao_fim, candidato.datas?.inscricao_fim),
+      entrega_fim: preencherData(existente.datas?.entrega_fim, candidato.datas?.entrega_fim),
+      resultado_previsto: preencherData(existente.datas?.resultado_previsto, candidato.datas?.resultado_previsto),
       texto_bruto: existente.datas?.texto_bruto || candidato.datas?.texto_bruto || null,
     },
     fontes: [...new Set([...(existente.fontes || []), ...(candidato.fontes || [])])],

@@ -13,7 +13,7 @@ import pathlib
 import re
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
-PAGINAS = ['index.html', 'terrenos.html', 'revisao.html']
+PAGINAS = ['index.html', 'terrenos.html', 'revisao.html', 'acompanhamento.html']
 
 
 def h(p):

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acompanhamento de concursos — Radar Odisse</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
+<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
+<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
+<link rel="stylesheet" href="css/styles.css?v=6ebf93593a">
+</head>
+<body class="u-pagina">
+
+  <header class="topo" data-pagina="concursos"></header>
+
+  <main class="pagina pagina--estreita">
+    <div class="pagina__barra">
+      <h1>Concursos</h1>
+      <nav class="subnav" id="subnav" aria-label="Páginas de Concursos"></nav>
+      <div class="pagina__estado">
+        <button type="button" class="u-botao" id="recarregar">Recarregar</button>
+      </div>
+    </div>
+    <p class="pagina__intro">Concursos escolhidos para acompanhar de perto. O Radar lê o site oficial de cada um (e as páginas de regras, prêmios e cronograma que encontrar) e mostra aqui o que achou. Os trechos vêm do próprio site: confira lá antes de decidir. A leitura se repete toda semana, na coleta.</p>
+
+    <div class="filtros">
+      <select id="f-situacao" aria-label="Situação">
+        <option value="todos">Acompanhando e inscritos</option>
+        <option value="acompanhando">Só acompanhando</option>
+        <option value="inscrito">Só inscritos</option>
+      </select>
+      <label class="filtros__check"><input type="checkbox" id="f-encerrados"> Mostrar com inscrições encerradas</label>
+    </div>
+
+    <p class="aviso" id="aviso" hidden></p>
+    <p class="resumo" id="resumo"></p>
+    <div class="acompanhados" id="acompanhados"></div>
+    <p class="vazio" id="vazio" hidden>Nenhum concurso em acompanhamento. No monitoramento geral, use “Acompanhar” no cartão ou a coluna Situação na lista.</p>
+  </main>
+
+  <script src="js/comum.js?v=5ef1900a76"></script>
+  <script src="js/extrair-site.js?v=ff2f426d82"></script>
+  <script src="js/site-oficial.js?v=dff3b3dec1"></script>
+  <script src="js/acompanhamento.js?v=b7d6dfeb39"></script>
+</body>
+</html>

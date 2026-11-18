@@ -53,6 +53,20 @@ O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os ar
 
 ## Interface
 
+- **Três páginas em Concursos** (submenu): Monitoramento geral (`index.html`), Acompanhamento
+  (`acompanhamento.html`) e Revisão (`revisao.html`).
+- **Situações:** monitorando, acompanhando, inscrito, arquivado. Na lista, a coluna Situação é um
+  seletor (com "Excluir…"). No cartão, o botão "Acompanhar" leva o concurso para o Acompanhamento.
+- **Acompanhamento:** ao entrar, o site oficial é lido no navegador (o Worker só repassa o HTML, em
+  `GET /api/concursos/:id/site`, restrito ao domínio do link oficial) por `js/extrair-site.js`:
+  banner, descrição, datas com o tipo de prazo, taxas, prêmios, júri, quem pode participar, local,
+  documentos e contato, incluindo até 3 páginas relacionadas do mesmo site. O resultado fica em
+  `acompanhamento`; campos vazios do concurso (banner, prazos) são preenchidos. A coleta semanal
+  relê esses sites (`scripts/completar-concursos.js`).
+- **Concursos incompletos:** a mesma coleta conserta datas a partir de `texto_bruto`
+  (`POST /api/manutencao/reparar`) e lê o site oficial de quem está sem banner ou sem prazo, uma vez
+  a cada 30 dias (`POST /api/manutencao/completar`).
+
 - **Versão dos arquivos:** antes de cada commit que mexe em `css/` ou `js/`, rode
   `python3 tools/versionar.py`. Ele põe `?v=<hash>` nos endereços dos arquivos nas páginas, para o
   navegador nunca misturar arquivo novo com arquivo velho guardado.

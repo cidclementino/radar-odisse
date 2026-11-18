@@ -177,7 +177,8 @@ function renderLote() {
 }
 
 function render() {
-  cacheGravar('revisao', pendencias); // o contador na página de Concursos lê daqui
+  cacheGravar('revisao', pendencias); // os contadores do submenu leem daqui
+  atualizarContadores();
   const lista = document.getElementById('pendencias');
   const comIndicio = new Set(pendencias.filter(temIndicio).map(p => p.candidato_novo.id));
   // primeiro os pares com indício (prováveis duplicados), depois o resto; mais antigos antes
@@ -210,5 +211,6 @@ async function carregar() {
   render();
 }
 
+montarSubnav('revisao');
 document.getElementById('recarregar').addEventListener('click', carregar);
 carregar();

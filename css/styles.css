@@ -502,7 +502,6 @@ select.situacao--descartado { color: var(--tinta-2); }
   .linha-tempo li { grid-template-columns: 90px 1fr; }
   .linha-tempo__trecho { grid-column: 1 / -1; white-space: normal; }
 }
-}
 
 /* ==========================================================================
    ENTRADA (senha) — como a entrada do Universo

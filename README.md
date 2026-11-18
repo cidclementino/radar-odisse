@@ -76,10 +76,11 @@ O endereço do Worker fica numa constante só, `WORKER`, em `js/comum.js`. Os ar
 
 ## Publicando o Worker
 
-O Worker `radar-odisse` está ligado a este repositório pelo Workers Builds da própria Cloudflare
-(token "radar-odisse build token"): cada push no `main` publica `worker/` sozinho. Não há workflow no
-GitHub para isso. O `name` em `worker/wrangler.toml` precisa continuar igual ao nome do Worker
-(`radar-odisse`). O passo a passo manual abaixo só vale se essa ligação for desfeita.
+O workflow `worker.yml` publica `worker/` sozinho a cada mudança no `main` (Worker `radar-odisse`),
+no mesmo padrão das outras ferramentas do Universo. Usa os secrets `CLOUDFLARE_API_TOKEN` e
+`CLOUDFLARE_ACCOUNT_ID` deste repositório. A publicação pelo Workers Builds da Cloudflare foi
+desligada em nov/2026 para não haver duas publicações. O `name` em `worker/wrangler.toml` precisa
+continuar igual ao nome do Worker (`radar-odisse`). O passo a passo manual abaixo continua valendo.
 
 
 ```bash

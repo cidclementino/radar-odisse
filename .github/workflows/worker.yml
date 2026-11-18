@@ -1,0 +1,57 @@
+name: Publicar Worker do Radar (Cloudflare)
+
+# Publica worker/ no Worker "radar-odisse" (radar-odisse.reservaprojectbasework.workers.dev) a cada
+# mudança em worker/ no main. Usa os secrets CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID deste
+# repositório (o token precisa de Account → Workers Scripts → Edit e Workers KV Storage → Edit).
+# Regrava COLLECT_SECRET a partir de RADAR_COLLECT_SECRET, o mesmo valor que a coleta usa.
+
+on:
+  push:
+    branches: [main]
+    paths: ['worker/**', '.github/workflows/worker.yml']
+  workflow_dispatch: {}
+
+concurrency:
+  group: radar-worker-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      RADAR_COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verificar secrets
+        run: |
+          for s in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!s}" ]; then echo "::error::Falta o secret $s neste repositório (Settings → Secrets and variables → Actions)."; exit 1; fi
+          done
+
+      - name: Publicar
+        working-directory: worker
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/wr" wrangler@4
+          W="$RUNNER_TEMP/wr/node_modules/.bin/wrangler"
+          "$W" deploy
+          [ -z "$RADAR_COLLECT_SECRET" ] || printf '%s' "$RADAR_COLLECT_SECRET" | "$W" secret put COLLECT_SECRET
+
+      - name: Conferir
+        run: |
+          URL="https://radar-odisse.reservaprojectbasework.workers.dev"
+          for i in 1 2 3 4 5 6 7 8; do
+            r=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$URL/api/revisao/resolver")
+            [ "$r" = "400" ] && break
+            sleep 5
+          done
+          echo "POST /api/revisao/resolver sem dados: $r (esperado 400)"
+          [ "$r" = "400" ] || { echo "::error::A rota nova não respondeu. O Worker pode não ter sido publicado."; exit 1; }
+          n=$(curl -s "$URL/api/concursos" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).length))')
+          echo "Concursos no Radar: $n"

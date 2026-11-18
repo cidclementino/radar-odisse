@@ -197,14 +197,6 @@ function renderDetalhe(c) {
 
   return `
     <div class="detalhe">
-      <label class="u-campo detalhe__apelido">
-        <span>Apelido de exibição</span>
-        <div class="detalhe__apelido-linha">
-          <input type="text" class="js-apelido" value="${escapeHTML(nomeExibido(c))}" maxlength="200">
-          <button type="button" class="u-botao js-salvar-apelido">Salvar</button>
-        </div>
-        ${c.apelido ? `<small>Nome capturado: ${escapeHTML(c.nome)}</small>` : ''}
-      </label>
       <div class="detalhe__grade">
         ${campoDetalhe('Promotor', c.promotor)}
         ${campoDetalhe('Destinado a', c.destinado_a)}
@@ -223,29 +215,69 @@ function renderDetalhe(c) {
     </div>`;
 }
 
+// ---------------------------------------------------------------- nome editável
+//
+// O lápis ao lado do título deixa trocar o nome exibido (`apelido`) ali mesmo: Enter ou clicar fora
+// salva, Esc desiste. O nome capturado na fonte (`nome`) não muda e aparece ao parar o cursor no título.
+
+const PENCIL = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M11.3 1.8a1.6 1.6 0 0 1 2.3 0l.6.6a1.6 1.6 0 0 1 0 2.3L5.5 13.4l-3.3.8.8-3.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 3.1l2.9 2.9" stroke="currentColor" stroke-width="1.4"/></svg>';
+
+function nomeEditavel(c) {
+  const titulo = c.apelido && c.apelido !== c.nome ? ` title="Nome na fonte: ${escapeHTML(c.nome)}"` : '';
+  return `<span class="js-nome" data-nome-id="${escapeHTML(c.id)}"${titulo}>${escapeHTML(nomeExibido(c))}</span><button type="button" class="editar-nome js-editar-nome" title="Editar nome" aria-label="Editar nome">${PENCIL}</button>`;
+}
+
+function ligarEdicaoNome(raiz, c) {
+  const botao = raiz.querySelector('.js-editar-nome');
+  const span = raiz.querySelector('.js-nome');
+  if (!botao || !span) return;
+  const parar = e => e.stopPropagation();
+  botao.addEventListener('keydown', parar);
+  botao.addEventListener('click', e => {
+    e.stopPropagation();
+    if (span.isContentEditable) return;
+    const antes = span.textContent;
+    let terminou = false;
+    span.contentEditable = 'plaintext-only';
+    span.classList.add('is-editando');
+    span.focus();
+    const sel = getSelection(); const r = document.createRange(); r.selectNodeContents(span); sel.removeAllRanges(); sel.addRange(r);
+
+    const fim = async salvar => {
+      if (terminou) return;
+      terminou = true;
+      span.contentEditable = 'false';
+      span.classList.remove('is-editando');
+      span.removeEventListener('keydown', teclas);
+      span.removeEventListener('click', parar);
+      const apelido = span.textContent.replace(/\s+/g, ' ').trim();
+      if (!salvar || !apelido || apelido === antes) { span.textContent = antes; return; }
+      const atualizado = await patchConcurso(c.id, { apelido }, 'Não foi possível salvar o nome agora. Tente de novo em instantes.');
+      if (!atualizado) { span.textContent = antes; return; }
+      substituir(atualizado);
+      Object.assign(c, atualizado);
+      // renomear não muda ordem nem visibilidade: atualiza só o nome onde ele aparece, sem redesenhar
+      document.querySelectorAll(`.js-nome[data-nome-id="${CSS.escape(c.id)}"]`).forEach(el => {
+        el.textContent = nomeExibido(atualizado);
+        if (atualizado.apelido !== atualizado.nome) el.title = `Nome na fonte: ${atualizado.nome}`; else el.removeAttribute('title');
+      });
+    };
+    const teclas = ev => {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') { ev.preventDefault(); span.blur(); }
+      if (ev.key === 'Escape') { ev.preventDefault(); fim(false); }
+    };
+    span.addEventListener('keydown', teclas);
+    span.addEventListener('click', parar);
+    span.addEventListener('blur', () => fim(true), { once: true });
+  });
+}
+
 /** liga os botões do painel de detalhe; nenhum clique ali dentro abre/fecha o item */
 function ligarDetalhe(raiz, c) {
   const painel = raiz.querySelector('.detalhe');
   painel.addEventListener('click', e => e.stopPropagation());
   painel.addEventListener('keydown', e => e.stopPropagation());
-
-  const input = painel.querySelector('.js-apelido');
-  const salvar = painel.querySelector('.js-salvar-apelido');
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); salvar.click(); } });
-  salvar.addEventListener('click', async () => {
-    const apelido = input.value.trim();
-    if (!apelido) { alert('O apelido não pode ficar vazio. Para voltar ao nome capturado, cole ele aqui.'); return; }
-    salvar.disabled = true;
-    const atualizado = await patchConcurso(c.id, { apelido }, 'Não foi possível salvar o apelido agora. Tente de novo em instantes.');
-    salvar.disabled = false;
-    if (!atualizado) return;
-    substituir(atualizado);
-    // renomear não muda ordem nem visibilidade: atualiza só o nome, sem fechar o painel
-    raiz.querySelectorAll('.js-nome').forEach(el => { el.textContent = nomeExibido(atualizado); });
-    if (raiz.previousElementSibling?.matches('tr.linha')) {
-      raiz.previousElementSibling.querySelector('.js-nome').textContent = nomeExibido(atualizado);
-    }
-  });
 
   const arquivar = painel.querySelector('.js-arquivar');
   arquivar.addEventListener('click', async () => {
@@ -332,7 +364,7 @@ function renderCard(c) {
     </div>
     <div class="concurso__corpo">
       <div class="concurso__tags">${tags}</div>
-      <h2 class="concurso__titulo js-nome">${escapeHTML(nomeExibido(c))}</h2>
+      <h2 class="concurso__titulo">${nomeEditavel(c)}</h2>
       <p class="concurso__local">${escapeHTML(c.local_projeto || '')}</p>
     </div>
     <div class="concurso__prazo">
@@ -365,6 +397,7 @@ function renderCard(c) {
   // imagem que não carrega vira o mesmo fundo neutro dos concursos sem banner
   el.querySelector('img.concurso__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
   ligarDetalhe(el, c);
+  ligarEdicaoNome(el, c);
   return el;
 }
 
@@ -428,7 +461,7 @@ function renderLista(itens) {
       <td class="col-sel"><label class="selecionar" title="Selecionar para fundir"><input type="checkbox" class="js-sel" data-id="${escapeHTML(c.id)}"${selecionados.has(c.id) ? ' checked' : ''} aria-label="Selecionar ${escapeHTML(nomeExibido(c))}"></label></td>
       <td><div class="linha__concurso">
         ${c.imagem_url ? `<img class="linha__banner" src="${escapeHTML(c.imagem_url)}" alt="" loading="lazy" decoding="async">` : '<span class="linha__banner"></span>'}
-        <div><div class="linha__titulo"><span class="js-nome">${escapeHTML(nomeExibido(c))}</span>${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
+        <div><div class="linha__titulo">${nomeEditavel(c)}${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
         ${c.promotor ? `<div class="u-apoio">${escapeHTML(c.promotor)}</div>` : ''}</div></div></td>
       <td>${escapeHTML(c.local_projeto || '')}</td>
       <td class="col-media">${escapeHTML((c.escopo || []).map(e => ESCOPO_LABELS[e] || e).join(', '))}</td>
@@ -473,6 +506,7 @@ function renderLista(itens) {
     });
     tr.querySelector('img.linha__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
     ligarDetalhe(det, c);
+    ligarEdicaoNome(tr, c);
     tbody.append(tr, det);
   }
 

@@ -195,10 +195,16 @@ a { color: inherit; }
 
 /* detalhe (cartão e lista) */
 .detalhe { cursor: default; font-size: 13px; }
-.detalhe__apelido { margin-bottom: 12px; }
-.detalhe__apelido-linha { display: flex; gap: 8px; }
-.detalhe__apelido > small { margin-top: 4px; }
-.detalhe__apelido-linha input { flex: 1; min-width: 0; }
+/* nome editável (lápis ao lado do título) */
+.editar-nome {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; margin-left: 4px; vertical-align: -4px;
+  background: none; border: 1px solid transparent; border-radius: 4px; color: var(--tinta-3); cursor: pointer;
+  opacity: 0; transition: opacity .15s;
+}
+.concurso:hover .editar-nome, .concurso.is-aberto .editar-nome, tr.linha:hover .editar-nome, .editar-nome:focus-visible { opacity: 1; }
+@media (hover: none) { .editar-nome { opacity: 1; } }
+.editar-nome:hover { color: var(--tinta); border-color: var(--linha-forte); background: var(--elevada); }
+.js-nome.is-editando { outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: 2px; cursor: text; background: var(--elevada); }
 .detalhe__grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px 16px; }
 .detalhe__item .u-rotulo { display: block; margin-bottom: 2px; }
 .detalhe__item > div:last-child { color: var(--tinta); line-height: 1.4; overflow-wrap: anywhere; }

@@ -222,10 +222,15 @@ function renderDetalhe(c) {
 
 const PENCIL = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M11.3 1.8a1.6 1.6 0 0 1 2.3 0l.6.6a1.6 1.6 0 0 1 0 2.3L5.5 13.4l-3.3.8.8-3.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 3.1l2.9 2.9" stroke="currentColor" stroke-width="1.4"/></svg>';
 
-function nomeEditavel(c) {
+const BOTAO_EDITAR_NOME = `<button type="button" class="editar-nome js-editar-nome" title="Editar nome" aria-label="Editar nome">${PENCIL}</button>`;
+
+function nomeSpan(c) {
   const titulo = c.apelido && c.apelido !== c.nome ? ` title="Nome na fonte: ${escapeHTML(c.nome)}"` : '';
-  return `<span class="js-nome" data-nome-id="${escapeHTML(c.id)}"${titulo}>${escapeHTML(nomeExibido(c))}</span><button type="button" class="editar-nome js-editar-nome" title="Editar nome" aria-label="Editar nome">${PENCIL}</button>`;
+  return `<span class="js-nome" data-nome-id="${escapeHTML(c.id)}"${titulo}>${escapeHTML(nomeExibido(c))}</span>`;
 }
+
+/** na lista o lápis fica logo depois do nome; no cartão ele fica no canto, na linha das etiquetas */
+const nomeEditavel = c => nomeSpan(c) + BOTAO_EDITAR_NOME;
 
 function ligarEdicaoNome(raiz, c) {
   const botao = raiz.querySelector('.js-editar-nome');
@@ -363,8 +368,8 @@ function renderCard(c) {
       ${situacao ? `<span class="u-etiqueta">${escapeHTML(situacao)}</span>` : ''}
     </div>
     <div class="concurso__corpo">
-      <div class="concurso__tags">${tags}</div>
-      <h2 class="concurso__titulo">${nomeEditavel(c)}</h2>
+      <div class="concurso__topo"><div class="concurso__tags">${tags}</div>${BOTAO_EDITAR_NOME}</div>
+      <h2 class="concurso__titulo">${nomeSpan(c)}</h2>
       <p class="concurso__local">${escapeHTML(c.local_projeto || '')}</p>
     </div>
     <div class="concurso__prazo">

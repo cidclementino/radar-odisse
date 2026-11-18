@@ -18,7 +18,8 @@ const MODALIDADES = [2, 3, 4, 5, 6, 7, 8];
 
 const TAMANHO_PAGINA = 50;
 const MAX_PAGINAS = 60; // trava de segurança por consulta
-const ESPERA_MS = 250; // entre chamadas, para não martelar a API
+// O PNCP devolve 429 com chamadas seguidas (visto na sondagem de 18/11: caiu na 9ª chamada a 250 ms).
+const ESPERA_MS = 1500; // entre chamadas
 
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 
@@ -30,12 +31,16 @@ async function buscarPagina(uf, modalidade, pagina, dataFinal) {
   const params = new URLSearchParams({
     dataFinal, codigoModalidadeContratacao: String(modalidade), uf, pagina: String(pagina), tamanhoPagina: String(TAMANHO_PAGINA),
   });
-  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+  const TENTATIVAS = 5;
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
     const res = await fetch(`${API}?${params}`, { headers: { Accept: 'application/json', 'User-Agent': 'radar.odisse.com.br (Odisse, Estúdio de Arquitetura e Design)' } });
     if (res.status === 204) return { data: [], totalPaginas: 0 };
     if (res.ok) return res.json();
-    if (tentativa === 3 || res.status < 500) throw new Error(`PNCP respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    await dormir(1500 * tentativa);
+    const repetir = res.status === 429 || res.status >= 500;
+    if (tentativa === TENTATIVAS || !repetir) throw new Error(`PNCP respondeu ${res.status}: ${(await res.text()).slice(0, 120).replace(/\s+/g, ' ')}`);
+    // 429: espera o que o servidor pedir (Retry-After) ou 15 s, 30 s, 45 s…
+    const pedido = Number(res.headers.get('retry-after'));
+    await dormir(Number.isFinite(pedido) && pedido > 0 ? pedido * 1000 : 15000 * tentativa);
   }
 }
 

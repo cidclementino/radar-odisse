@@ -12,9 +12,13 @@ const RE_PROJETO_ARQ = /\bprojet\w*\s+(arquitetonic|de arquitetura|de urbanismo|
 const RE_SERVICO_ARQ = /\bservicos?\s+(tecnicos?\s+)?(especializados?\s+)?(de\s+)?(arquitetura|urbanismo)\b/;
 
 // Assunto ligado a edificação, cidade ou paisagem — o que interessa ao Odisse.
-const RE_ASSUNTO = /(arquitet|urban|paisag|interiores|restaur|patrimonio|tombad|requalifica|retrofit|edifica|predio|sede|escola|creche|unidade basica|ubs|hospital|posto de saude|praca|parque|orla|mercado publico|ginasio|quadra|centro de|museu|teatro|biblioteca|habitac|reforma|ampliacao|construcao)/;
+const RE_ASSUNTO = /(arquitet|urban|paisag|interiores|restaur|patrimonio|tombad|requalifica|retrofit|edifica|predio|sede|escola|creche|unidade basica|ubs|hospital|posto de saude|praca|parque|orla|mercado publico|ginasio|quadra|centro de|museu|teatro|biblioteca|habitac|plano diretor|reforma|ampliacao|construcao)/;
 // Engenharia sem edificação (estrada, rede, poço…): fora, se não houver também um assunto acima.
 const RE_INFRA = /(pavimenta|esgot|saneamento|drenagem|abastecimento de agua|adutora|rodovi|estrada|vicinal|ponte|eletrifica|iluminacao publica|\bpocos?\b|barragem|acude|aterro sanitario|georreferencia|topografi)/;
+// Sistemas prediais contratados sozinhos (subestação, elevador, ar-condicionado…): é engenharia de
+// instalação, não projeto de arquitetura. Fora, a não ser que o objeto também fale da edificação.
+const RE_SISTEMAS = /(subestac|elevador|transporte vertical|climatiza|ar condicionado|grupo gerador|cabeamento|rede logica|cftv|energia solar|fotovolta|usina|spda|para raio|gases medicinais)/;
+const RE_EDIFICACAO = /(arquitet|urban|paisag|implantacao d[oa]s?\s+(centro|escola|creche|unidade|sede|praca|parque|mercado)|construcao d|reforma d|ampliacao d|edificac|requalifica|restaur)/;
 // Projeto e obra no mesmo contrato.
 const RE_COM_OBRA = /(contratacao integrada|semi ?integrada|projetos?\s+(\S+\s+){0,8}?e\s+(a\s+)?execu|elabora\w*\s+(\S+\s+){0,12}?e\s+(a\s+)?execu|execu\w*\s+(\S+\s+){0,6}?e\s+elabora)/;
 
@@ -35,7 +39,8 @@ function classificarObjeto(objeto, complemento = '') {
   if (!ehProjeto) return null;
   const assunto = RE_ASSUNTO.test(t);
   if (!assunto && !/arquitet|urban|paisag/.test(t)) return null;
-  if (RE_INFRA.test(t) && !/(arquitet|urban|paisag|edifica|predio|escola|creche|praca|sede)/.test(t)) return null;
+  if (RE_INFRA.test(t) && !/(arquitet|urbanis|paisag|edifica|predio|escola|creche|praca|sede)/.test(t)) return null;
+  if (RE_SISTEMAS.test(t) && !RE_EDIFICACAO.test(t)) return null;
 
   const tudo = `${t} ${normalizeText(complemento)}`;
   const escopo = ESCOPOS.filter(([, re]) => re.test(tudo)).map(([nome]) => nome);

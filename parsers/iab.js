@@ -15,7 +15,7 @@
 // post (js/extrair-site.js); o que faltar a coleta tenta completar pelo site oficial depois.
 
 const Parser = require('rss-parser');
-const { generateId } = require('./lib/normalize');
+const { generateId, similarity } = require('./lib/normalize');
 const { extrairSite, palpites } = require('../js/extrair-site.js');
 
 const JANELA_DIAS = 150;
@@ -39,7 +39,8 @@ const RE_EXCLUI = /recebe\s+\d+\s+inscri|inscri[çc][õo]es\s+recebidas|resultad
 // prefixos de chamada que não fazem parte do nome do concurso
 const RE_PREFIXO = /^(?:inscri[çc][õo]es\s+abertas|[úu]ltimos\s+dias(?:\s+para\s+(?:as\s+)?inscri[çc][õo]es)?|aberto\s+o\s+per[íi]odo\s+de\s+inscri[çc][õo]es\s+para\s+o|aberta[s]?\s+as\s+inscri[çc][õo]es\s+(?:para|do|da)\s+o?|prorrogad[oa]s?\s+(?:as\s+)?inscri[çc][õo]es\s+(?:para|do|da)\s+o?|lan[çc]ad[oa]|lan[çc]amento(?:\s+do)?|est[ãa]o\s+abertas\s+as\s+inscri[çc][õo]es\s+(?:para|do|da)\s+o?)\s*[:–—-]?\s*/i;
 // "IAB RJ e Prefeitura do Rio lançam concurso de ideias…" → "Concurso de ideias…"
-const RE_QUEM_LANCA = /^.{0,90}?\b(?:lan[çc]am?|promovem?|abrem?|realizam?|anunciam?)\s+(?=(?:o\s+|um\s+)?concurso)/i;
+// (só quando quem lança é uma instituição; "15ª Bienal lança concurso para seu cartaz" fica inteiro)
+const RE_QUEM_LANCA = /^(?:IAB|Prefeitura|Governo|Secretaria|Funda[çc][ãa]o|Minist[ée]rio|Caixa|Sesc|Sebrae)\b.{0,90}?\b(?:lan[çc]am?|promovem?|abrem?|realizam?|anunciam?)\s+(?=(?:o\s+|um\s+)?concurso)/i;
 const RE_REDES = /facebook|instagram|twitter|x\.com|linkedin|youtube|youtu\.be|wa\.me|whatsapp|t\.me|tiktok|flickr|pinterest|google\.com\/maps|goo\.gl|bit\.ly\/?$/i;
 
 const rss = new Parser({ customFields: { item: [['content:encoded', 'contentEncoded'], ['media:content', 'mediaContent', { keepArray: true }]] } });
@@ -205,7 +206,7 @@ function juntarRepetidos(itens) {
   for (const c of itens) {
     const k1 = c.link_oficial && !/forms\.gle|docs\.google/.test(c.link_oficial) ? chaveLink(c.link_oficial) : null;
     const k2 = chaveNome(c.nome);
-    const igual = saida.find(o => (k1 && o._k1 === k1) || o._k2 === k2);
+    const igual = saida.find(o => (k1 && o._k1 === k1) || o._k2 === k2 || similarity(o.nome, c.nome) >= 0.8);
     if (!igual) { saida.push({ ...c, _k1: k1, _k2: k2 }); continue; }
     for (const campo of ['local_projeto', 'imagem_url', 'link_oficial']) igual[campo] = igual[campo] || c[campo];
     for (const campo of ['inscricao_fim', 'entrega_fim', 'resultado_previsto']) igual.datas[campo] = igual.datas[campo] || c.datas[campo];

@@ -14,4 +14,5 @@ module.exports = [
   require('./competitionsarchi'),
   require('./bustler'),
   require('./iab'), // IAB nacional e departamentos estaduais (ver parsers/iab.js)
+  require('./vitruvius'), // seção parada desde mai/2024; fica ligada caso volte
 ];

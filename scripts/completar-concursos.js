@@ -69,14 +69,15 @@ async function main() {
   const acompanhados = concursos.filter(c => ['acompanhando', 'inscrito'].includes(c.status_interno)
     && c.link_oficial && antigo(c.acompanhamento?.lido_em, DIAS_ENTRE_LEITURAS_ACOMPANHAMENTO));
   const incompletos = concursos.filter(c => c.status_interno !== 'descartado' && !acompanhados.includes(c)
-    && c.link_oficial && aberto(c) && (!c.imagem_url || !c.datas?.inscricao_fim || !c.datas?.entrega_fim)
+    && (c.link_oficial || c.fonte_url_original) && aberto(c) && (!c.imagem_url || !c.datas?.inscricao_fim || !c.datas?.entrega_fim)
     && antigo(c.completado_em, DIAS_ENTRE_TENTATIVAS));
   const fila = [...acompanhados, ...incompletos].slice(0, LIMITE_POR_RODADA);
   console.log(`${acompanhados.length} em acompanhamento para reler, ${incompletos.length} incompletos; lendo ${fila.length} sites.`);
 
   const itens = [];
   for (const c of fila) {
-    const { site, erro } = await lerSite(c.link_oficial);
+    // sem site oficial, a própria publicação na fonte (ex.: notícia do IAB) costuma ter os prazos
+    const { site, erro } = await lerSite(c.link_oficial || c.fonte_url_original);
     const p = palpites(site);
     const item = { id: c.id, campos: { imagem_url: p.imagem_url, inscricao_fim: p.inscricao_fim, entrega_fim: p.entrega_fim, resultado_previsto: p.resultado_previsto } };
     if (acompanhados.includes(c)) item.acompanhamento = { ...(c.acompanhamento || {}), site, erro, lido_em: new Date().toISOString() };

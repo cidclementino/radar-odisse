@@ -35,9 +35,11 @@ const DEPARTAMENTOS = [
 // precisa parecer chamada de concurso…
 const RE_INCLUI = /concurso|premia[çc][ãa]o|pr[êe]mio|chamamento|chamada\s+(aberta|p[úu]blica)|competi[çc][ãa]o|open\s+call|bienal.*(cartaz|concurso)/i;
 // …e não ser resultado, júri, licitação, emprego público ou notícia institucional
-const RE_EXCLUI = /resultado|vencedor|premiad[oa]s|homologa|julgamento|comiss[ãa]o\s+julgadora|j[úu]ri\b|cerim[ôo]nia|exposi[çc][ãa]o\s+d|\bata\b|licita[çc][ãa]o|obras|provas?\s+(e|de)\s+t[íi]tulos|concurso\s+p[úu]blico\s+(para\s+(cargo|provimento|professor)|de\s+provas)|t[ée]cnicos?\s+de\s+campo|congratula|\bnota\b|manifesto|elei[çc]|assembleia|parceria\s+para|balan[çc]o/i;
+const RE_EXCLUI = /recebe\s+\d+\s+inscri|inscri[çc][õo]es\s+recebidas|resultado|vencedor|premiad[oa]s|homologa|julgamento|comiss[ãa]o\s+julgadora|j[úu]ri\b|cerim[ôo]nia|exposi[çc][ãa]o\s+d|\bata\b|licita[çc][ãa]o|obras|provas?\s+(e|de)\s+t[íi]tulos|concurso\s+p[úu]blico\s+(para\s+(cargo|provimento|professor)|de\s+provas)|t[ée]cnicos?\s+de\s+campo|congratula|\bnota\b|manifesto|elei[çc]|assembleia|parceria\s+para|balan[çc]o/i;
 // prefixos de chamada que não fazem parte do nome do concurso
 const RE_PREFIXO = /^(?:inscri[çc][õo]es\s+abertas|[úu]ltimos\s+dias(?:\s+para\s+(?:as\s+)?inscri[çc][õo]es)?|aberto\s+o\s+per[íi]odo\s+de\s+inscri[çc][õo]es\s+para\s+o|aberta[s]?\s+as\s+inscri[çc][õo]es\s+(?:para|do|da)\s+o?|prorrogad[oa]s?\s+(?:as\s+)?inscri[çc][õo]es\s+(?:para|do|da)\s+o?|lan[çc]ad[oa]|lan[çc]amento(?:\s+do)?|est[ãa]o\s+abertas\s+as\s+inscri[çc][õo]es\s+(?:para|do|da)\s+o?)\s*[:–—-]?\s*/i;
+// "IAB RJ e Prefeitura do Rio lançam concurso de ideias…" → "Concurso de ideias…"
+const RE_QUEM_LANCA = /^.{0,90}?\b(?:lan[çc]am?|promovem?|abrem?|realizam?|anunciam?)\s+(?=(?:o\s+|um\s+)?concurso)/i;
 const RE_REDES = /facebook|instagram|twitter|x\.com|linkedin|youtube|youtu\.be|wa\.me|whatsapp|t\.me|tiktok|flickr|pinterest|google\.com\/maps|goo\.gl|bit\.ly\/?$/i;
 
 const rss = new Parser({ customFields: { item: [['content:encoded', 'contentEncoded'], ['media:content', 'mediaContent', { keepArray: true }]] } });
@@ -137,7 +139,8 @@ function linkOficial(html, link) {
 }
 
 function paraConcurso(dep, post) {
-  const nome = post.titulo.replace(RE_PREFIXO, '').replace(/^[“"']|[”"']$/g, '').trim();
+  let nome = post.titulo.replace(RE_PREFIXO, '').replace(RE_QUEM_LANCA, '').replace(/^(?:o|um)\s+/i, '').replace(/^[“"']|[”"']$/g, '').trim();
+  if (nome === nome.toUpperCase()) nome = nome.toLowerCase(); // título todo em maiúsculas
   const site = extrairSite(post.html, post.link);
   const p = palpites(site);
   const texto = decodificar(post.html);
@@ -188,18 +191,59 @@ function criarParser(dep) {
 }
 
 const parsers = DEPARTAMENTOS.map(criarParser);
-module.exports = parsers;
+
+// O mesmo concurso costuma sair em vários departamentos (e várias vezes no mesmo: lançamento,
+// "últimos dias", prorrogação). Junta os que têm o mesmo site oficial ou o mesmo nome antes de
+// mandar ao Radar: fica o primeiro, completado com o que os outros tiverem, e as fontes somadas.
+function chaveLink(u) {
+  try { const x = new URL(u); return (x.hostname.replace(/^www\./, '') + x.pathname.replace(/\/+$/, '')).toLowerCase(); } catch { return null; }
+}
+const chaveNome = n => String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+function juntarRepetidos(itens) {
+  const saida = [];
+  for (const c of itens) {
+    const k1 = c.link_oficial && !/forms\.gle|docs\.google/.test(c.link_oficial) ? chaveLink(c.link_oficial) : null;
+    const k2 = chaveNome(c.nome);
+    const igual = saida.find(o => (k1 && o._k1 === k1) || o._k2 === k2);
+    if (!igual) { saida.push({ ...c, _k1: k1, _k2: k2 }); continue; }
+    for (const campo of ['local_projeto', 'imagem_url', 'link_oficial']) igual[campo] = igual[campo] || c[campo];
+    for (const campo of ['inscricao_fim', 'entrega_fim', 'resultado_previsto']) igual.datas[campo] = igual.datas[campo] || c.datas[campo];
+    igual.fontes = [...new Set([...igual.fontes, ...c.fontes])];
+  }
+  return saida.map(({ _k1, _k2, ...c }) => c);
+}
+
+// Um parser só no registro (FONTE "iab"); cada concurso sai com o(s) site(s) do IAB em `fontes`.
+module.exports = {
+  FONTE: 'iab',
+  async parse() {
+    const todos = [];
+    for (const p of parsers) {
+      try {
+        const itens = await p.parse();
+        console.log(`[iab] ${p.FONTE}: ${itens.length}`);
+        todos.push(...itens);
+      } catch (err) {
+        console.error(`[iab] ${p.FONTE} falhou:`, err.message);
+      }
+    }
+    const juntos = juntarRepetidos(todos);
+    if (juntos.length < todos.length) console.log(`[iab] ${todos.length - juntos.length} publicação(ões) repetida(s) juntada(s).`);
+    return juntos;
+  },
+};
 
 // Teste local: node parsers/iab.js [dominio]
 if (require.main === module) {
   (async () => {
     const alvo = process.argv[2];
-    for (const p of parsers.filter(x => !alvo || x.FONTE === alvo)) {
+    for (const p of alvo ? parsers.filter(x => x.FONTE === alvo) : [module.exports]) {
       try {
         const itens = await p.parse();
         console.log(`\n=== ${p.FONTE}: ${itens.length}`);
         for (const c of itens) {
-          console.log(`- ${c.nome.slice(0, 90)}\n    inscr ${c.datas.inscricao_fim || '—'} · entrega ${c.datas.entrega_fim || '—'} · local ${c.local_projeto || '—'} · img ${c.imagem_url ? 'sim' : 'não'}\n    oficial ${c.link_oficial || '—'}\n    post ${c.fonte_url_original}`);
+          console.log(`- ${c.nome.slice(0, 90)} [${c.fontes.join(', ')}]\n    inscr ${c.datas.inscricao_fim || '—'} · entrega ${c.datas.entrega_fim || '—'} · local ${c.local_projeto || '—'} · img ${c.imagem_url ? 'sim' : 'não'}\n    oficial ${c.link_oficial || '—'}\n    post ${c.fonte_url_original}`);
         }
       } catch (err) {
         console.log(`\n=== ${p.FONTE}: ERRO ${err.message}`);

@@ -13,4 +13,5 @@ module.exports = [
   require('./concursosdeprojeto'),
   require('./competitionsarchi'),
   require('./bustler'),
+  require('./iab'), // IAB nacional e departamentos estaduais (ver parsers/iab.js)
 ];

@@ -53,6 +53,20 @@ function ehPostDeResultado(item) {
   return RE_TITULO_RESULTADO.test((item.title || '').trim());
 }
 
+/**
+ * O site também publica textos que não são chamadas (manifesto, exposição,
+ * artigo de opinião). Toda chamada aberta leva a categoria "concursos" ou
+ * "concurso nacional/internacional"; esses outros posts não. Se o feed vier
+ * sem categorias, não dá pra saber e o post passa.
+ */
+const RE_CATEGORIA_CHAMADA = /^(concursos|concurso (nacional|internacional))$/i;
+
+function naoEhChamada(item) {
+  const categorias = (item.categories || []).map(c => String(c._ || c).trim());
+  if (!categorias.length) return false;
+  return !categorias.some(c => RE_CATEGORIA_CHAMADA.test(c));
+}
+
 /** Extrai a primeira URL de imagem do HTML do post (capa/banner). */
 function extrairImagem(item) {
   if (item.mediaContent && item.mediaContent[0]?.$?.url) {
@@ -99,11 +113,16 @@ async function parse() {
   const feed = await rssParser.parseURL(FEED_URL);
 
   let descartadosResultado = 0;
+  let descartadosOutros = 0;
 
   const concursos = feed.items
     .filter(item => {
       if (ehPostDeResultado(item)) {
         descartadosResultado++;
+        return false;
+      }
+      if (naoEhChamada(item)) {
+        descartadosOutros++;
         return false;
       }
       return true;
@@ -149,6 +168,9 @@ async function parse() {
       };
     });
 
+  if (descartadosOutros > 0) {
+    console.log(`[concursosdeprojeto.org] ${descartadosOutros} post(s) que não são chamada (manifesto, exposição, artigo) ignorado(s).`);
+  }
   if (descartadosResultado > 0) {
     console.log(`[concursosdeprojeto.org] ${descartadosResultado} post(s) de resultado/premiação descartado(s) (não são oportunidade aberta).`);
   }

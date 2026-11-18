@@ -1,0 +1,41 @@
+name: Manter agendamentos ativos
+
+# O GitHub desliga sozinho os workflows agendados (schedule) de repositórios públicos que passam
+# 60 dias sem commit (estado "disabled_inactivity"). Foi o que parou o Radar entre set. e nov. de 2026.
+#
+# Este workflow roda nos dias 1 e 15 de cada mês e reativa, pela API, todos os workflows do
+# repositório, inclusive ele mesmo. Reativar zera a contagem dos 60 dias. Se algum já tiver sido
+# desligado por inatividade, ele volta. Workflows desligados à mão (disabled_manually) são respeitados.
+# Não faz commit nem usa ação de terceiros: só o GITHUB_TOKEN do próprio repositório.
+
+on:
+  schedule:
+    - cron: '41 11 1,15 * *' # dias 1 e 15, 08:41 em Brasília
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+
+jobs:
+  reativar:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Reativar workflows agendados
+        run: |
+          gh api "repos/$REPO/actions/workflows" --paginate \
+            --jq '.workflows[] | select(.path | startswith(".github/workflows/")) | "\(.id)\t\(.state)\t\(.name)"' |
+          while IFS=$'\t' read -r id estado nome; do
+            if [ "$estado" = "disabled_manually" ]; then
+              echo "Mantido desligado (à mão): $nome"
+              continue
+            fi
+            gh api -X PUT "repos/$REPO/actions/workflows/$id/enable" --silent
+            if [ "$estado" = "disabled_inactivity" ]; then
+              echo "::warning::Estava desligado por inatividade e foi reativado: $nome"
+            else
+              echo "Mantido ativo: $nome"
+            fi
+          done

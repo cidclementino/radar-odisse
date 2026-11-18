@@ -264,11 +264,16 @@ th.col-num .th-ordena { text-align: right; }
 
 .linha { cursor: default; }
 #lista .linha { cursor: pointer; }
-.linha td:first-child { box-shadow: inset 3px 0 0 transparent; min-width: 240px; }
+.linha td:first-child { box-shadow: inset 3px 0 0 transparent; min-width: 300px; }
 .linha--alta td:first-child, .linha--nivel-3 td:first-child { box-shadow: inset 3px 0 0 var(--alta); }
 .linha--media td:first-child, .linha--nivel-2 td:first-child { box-shadow: inset 3px 0 0 var(--media); }
 .linha--baixa td:first-child { box-shadow: inset 3px 0 0 var(--baixa); }
 .linha__titulo { font-weight: 600; text-decoration: none; }
+.linha__concurso { display: flex; align-items: center; gap: 12px; }
+.linha__banner {
+  flex: none; display: block; width: 72px; aspect-ratio: 16 / 10; object-fit: cover; object-position: center;
+  border-radius: 4px; background: var(--nevoa); border: 1px solid var(--linha);
+}
 a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline; text-underline-offset: 3px; }
 .linha.is-aberto { background: var(--veu); }
 .linha .dias { font-weight: 650; }

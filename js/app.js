@@ -367,8 +367,10 @@ function renderLista(itens) {
     tr.className = `linha linha--${urgencia(dias, encerrado)}${c.status_interno === 'descartado' || encerrado ? ' is-apagado' : ''}`;
     tr.tabIndex = 0;
     tr.innerHTML = `
-      <td><div class="linha__titulo"><span class="js-nome">${escapeHTML(nomeExibido(c))}</span>${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
-        ${c.promotor ? `<div class="u-apoio">${escapeHTML(c.promotor)}</div>` : ''}</td>
+      <td><div class="linha__concurso">
+        ${c.imagem_url ? `<img class="linha__banner" src="${escapeHTML(c.imagem_url)}" alt="" loading="lazy" decoding="async">` : '<span class="linha__banner"></span>'}
+        <div><div class="linha__titulo"><span class="js-nome">${escapeHTML(nomeExibido(c))}</span>${ehNovo(c) ? ' <span class="u-etiqueta selo-novo">Novo</span>' : ''}</div>
+        ${c.promotor ? `<div class="u-apoio">${escapeHTML(c.promotor)}</div>` : ''}</div></div></td>
       <td>${escapeHTML(c.local_projeto || '')}</td>
       <td class="col-media">${escapeHTML((c.escopo || []).map(e => ESCOPO_LABELS[e] || e).join(', '))}</td>
       <td class="col-media">${c.tipo === 'nacional' ? 'Nacional' : c.tipo === 'internacional' ? 'Internacional' : ''}</td>
@@ -394,6 +396,7 @@ function renderLista(itens) {
     };
     tr.addEventListener('click', alternar);
     tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(); } });
+    tr.querySelector('img.linha__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
     ligarDetalhe(det, c);
     tbody.append(tr, det);
   }

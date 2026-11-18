@@ -17,7 +17,7 @@
 //   POST   /api/manutencao/completar -> preenche campos vazios e o acompanhamento de uma leva (idem)
 //   POST   /api/collect            -> recebe candidatos brutos de um parser de Concurso (Authorization: Bearer <secret>)
 //   PATCH  /api/concursos/:id      -> atualiza status_interno e/ou apelido de um Concurso (ex: descartar/restaurar, renomear exibição)
-//   DELETE /api/concursos/:id      -> apaga um Concurso definitivamente do KV
+//   DELETE /api/concursos/:id      -> apaga um Concurso e deixa uma lápide (`_ignorado:<id>`) para a coleta não trazê-lo de volta
 //   GET    /api/oportunidades      -> lista todas as Oportunidades (Terrenos)
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
@@ -55,12 +55,16 @@ function json(data, status = 200) {
 // dentro do for — com N chaves no KV, isso soma N idas-e-voltas sequenciais
 // (e cresce a cada nova captura). Buscar em paralelo por página faz o tempo
 // total ficar próximo do tempo da leitura mais lenta, não da soma de todas.
-async function listAll(kv) {
+// Lápides de concursos apagados ficam no mesmo KV, com este prefixo; listAll() as deixa de fora.
+const PREFIXO_IGNORADO = '_ignorado:';
+
+async function listAll(kv, prefix) {
   const out = [];
   let cursor;
   do {
-    const page = await kv.list({ cursor });
-    const valores = await Promise.all(page.keys.map(key => kv.get(key.name, 'json')));
+    const page = await kv.list({ cursor, prefix });
+    const chaves = prefix ? page.keys : page.keys.filter(k => !k.name.startsWith(PREFIXO_IGNORADO));
+    const valores = await Promise.all(chaves.map(key => kv.get(key.name, 'json')));
     out.push(...valores.filter(Boolean));
     cursor = page.cursor;
   } while (cursor);
@@ -78,8 +82,22 @@ async function handleCollect(request, env) {
     return json({ error: 'payload deve ser um array de Concursos' }, 400);
   }
 
-  const existentes = await listAll(env.CONCURSOS);
-  const resultado = classificarConcursos(existentes, candidatos);
+  const [ativos, ignorados] = await Promise.all([
+    listAll(env.CONCURSOS),
+    listAll(env.CONCURSOS, PREFIXO_IGNORADO),
+  ]);
+
+  // Concursos apagados entram na comparação como se ainda existissem: assim um candidato que é o
+  // mesmo concurso (mesmo id, um id já fundido nele ou outra fonte com nome/datas que batem) é
+  // reconhecido. Só que, em vez de ser gravado, ele é descartado em silêncio.
+  const idsIgnorados = new Set(ignorados.flatMap(c => [c.id, ...(c.ids_fundidos || [])]));
+  const deFora = candidatos.filter(c => idsIgnorados.has(c.id));
+  const resultado = classificarConcursos([...ativos, ...ignorados], candidatos.filter(c => !idsIgnorados.has(c.id)));
+  const ehIgnorado = id => idsIgnorados.has(id);
+  const antes = resultado.fundidos.length + resultado.pendentes_revisao.length;
+  resultado.fundidos = resultado.fundidos.filter(c => !ehIgnorado(c.id));
+  resultado.pendentes_revisao = resultado.pendentes_revisao.filter(p => !ehIgnorado(p.candidato_existente.id));
+  const barrados = deFora.length + antes - resultado.fundidos.length - resultado.pendentes_revisao.length;
 
   // Aplica fusões automáticas
   for (const item of resultado.fundidos) {
@@ -106,6 +124,7 @@ async function handleCollect(request, env) {
     fundidos: resultado.fundidos.length,
     novos: resultado.novos.length,
     pendentes_revisao: resultado.pendentes_revisao.length,
+    ignorados_por_terem_sido_apagados: barrados,
   });
 }
 
@@ -283,14 +302,17 @@ async function handleCompletar(request, env) {
 }
 
 /**
- * DELETE /api/concursos/:id — apaga o Concurso definitivamente do KV.
- * Irreversível — o front-end pede confirmação antes de chamar essa rota.
+ * DELETE /api/concursos/:id — tira o Concurso do Radar de vez.
+ * Antes de apagar, grava uma lápide (`_ignorado:<id>`, com o registro completo e `excluido_em`):
+ * sem ela, a coleta seguinte achava o concurso de novo na fonte e o recriava como novo.
+ * A coleta compara os candidatos com as lápides e descarta o que bater (ver handleCollect).
  */
 async function handleDeleteConcurso(env, id) {
   const existente = await env.CONCURSOS.get(id, 'json');
   if (!existente) {
     return json({ error: 'concurso não encontrado' }, 404);
   }
+  await env.CONCURSOS.put(PREFIXO_IGNORADO + id, JSON.stringify({ ...existente, excluido_em: new Date().toISOString() }));
   await env.CONCURSOS.delete(id);
   return json({ deletado: true, id });
 }

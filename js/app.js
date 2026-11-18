@@ -256,7 +256,7 @@ function ligarDetalhe(raiz, c) {
 
   const apagar = painel.querySelector('.js-apagar');
   apagar.addEventListener('click', async () => {
-    if (!confirm(`Apagar definitivamente "${nomeExibido(c)}"? Essa ação não pode ser desfeita.`)) return;
+    if (!confirm(`Apagar definitivamente "${nomeExibido(c)}"? Ele sai do Radar e não volta nas próximas coletas. Essa ação não pode ser desfeita.`)) return;
     apagar.disabled = true;
     const ok = await apagarConcurso(c.id);
     apagar.disabled = false;
@@ -455,7 +455,7 @@ function renderLista(itens) {
       const valor = sel.value;
       sel.disabled = true;
       if (valor === 'excluir') {
-        if (confirm(`Apagar definitivamente "${nomeExibido(c)}"? Essa ação não pode ser desfeita.`) && await apagarConcurso(c.id)) {
+        if (confirm(`Apagar definitivamente "${nomeExibido(c)}"? Ele sai do Radar e não volta nas próximas coletas. Essa ação não pode ser desfeita.`) && await apagarConcurso(c.id)) {
           remover(c.id);
           render();
           return;

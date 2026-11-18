@@ -203,7 +203,8 @@ a { color: inherit; }
   background: none; border: 1px solid transparent; border-radius: 4px; color: var(--tinta-3); cursor: pointer;
   opacity: 0; transition: opacity .15s;
 }
-.concurso:hover .editar-nome, .concurso.is-aberto .editar-nome, tr.linha:hover .editar-nome, .editar-nome:focus-visible { opacity: 1; }
+.concurso:hover .editar-nome, .concurso.is-aberto .editar-nome, tr.linha:hover .editar-nome, .editar-nome:focus-visible,
+.oportunidade:hover .editar-nome, .corretor:hover .editar-nome { opacity: 1; }
 @media (hover: none) { .editar-nome { opacity: 1; } }
 .editar-nome:hover { color: var(--tinta); border-color: var(--linha-forte); background: var(--elevada); }
 .js-nome.is-editando { outline: 2px solid var(--destaque); outline-offset: 2px; border-radius: 2px; cursor: text; background: var(--elevada); }
@@ -566,3 +567,20 @@ select.situacao--descartado { color: var(--tinta-2); }
 .envio__avisos, .envio__bloqueios { margin: 0; padding: 10px 14px 10px 28px; border-radius: var(--raio-p); display: flex; flex-direction: column; gap: 4px; }
 .envio__avisos { background: var(--veu); color: var(--tinta); }
 .envio__bloqueios { background: var(--perigo-fundo); color: var(--perigo); }
+
+/* ---------------------------------------------------------------- Terrenos: edição manual */
+.secao__cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.secao__cabeca .secao__titulo { margin: 0; }
+.oportunidade__tags .editar-nome { margin: -1px -4px 0 auto; vertical-align: 0; flex: none; }
+.corretor__selos .editar-nome { margin: 0 -4px 0 2px; vertical-align: 0; }
+.oportunidade__obs, .corretor__obs {
+  margin: 6px 0 0; font-size: 12px; color: var(--tinta-2); line-height: 1.45; white-space: pre-line;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.edicao--larga { width: min(620px, calc(100vw - 32px)); }
+.edicao__grade { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.edicao__grade .u-campo { min-width: 0; }
+.edicao__grade .u-campo input, .edicao__grade .u-campo select, .edicao__grade .u-campo textarea { width: 100%; box-sizing: border-box; }
+.edicao__grade .u-campo textarea { resize: vertical; font: inherit; }
+.edicao__largo { grid-column: 1 / -1; }
+@media (max-width: 640px) { .edicao__grade { grid-template-columns: 1fr; } }

@@ -151,6 +151,6 @@ Ambos também têm `workflow_dispatch` (rodar manualmente pela aba Actions).
 
 **Terrenos:**
 - Validar parsers de OLX/ZAP contra HTML real (ver ressalva em `TERRENOS.md`).
-- Criar a chave da YouTube Data API v3.
+
 - Decidir fontes de "sites especializados".
-- Botões de ação nos cards de Oportunidade.
+- "Levar aos Contatos" e "Enviar ao funil" (vendas.odisse).

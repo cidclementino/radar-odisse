@@ -9,7 +9,7 @@
 <link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
 <link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
 <link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=d491cecbdb">
+<link rel="stylesheet" href="css/styles.css?v=6ac1d9d62e">
 <script src="js/auth.js?v=72f6ee79ac"></script>
 <script>exigirAutenticacao();</script>
   <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
@@ -33,16 +33,19 @@
         <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
       </div>
     </div>
-    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade. O sistema registra o sinal; a leitura de abordagem é manual.</p>
+    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade. O sistema registra o sinal; a leitura de abordagem é manual. O lápis corrige ou completa terrenos e corretores, e o que for corrigido à mão a coleta não mexe mais.</p>
 
     <section aria-labelledby="titulo-oportunidades">
-      <h2 class="secao__titulo" id="titulo-oportunidades">Oportunidades</h2>
+      <div class="secao__cabeca">
+        <h2 class="secao__titulo" id="titulo-oportunidades">Oportunidades</h2>
+        <button type="button" class="u-botao" id="novo-terreno">Novo terreno</button>
+      </div>
       <div class="filtros">
         <input type="search" id="f-busca" placeholder="Buscar no título ou no local" aria-label="Buscar oportunidades">
         <select id="f-situacao" aria-label="Situação">
           <option value="monitorando">Em monitoramento</option>
           <option value="todas">Todas as situações</option>
-          <option value="ocultas">Abordadas ou descartadas</option>
+          <option value="ocultas">Descartadas ou no funil</option>
         </select>
         <select id="f-nivel" aria-label="Nível de maturidade">
           <option value="">Todos os níveis</option>
@@ -76,10 +79,18 @@
     </section>
 
     <section class="secao" id="section-corretores" aria-labelledby="titulo-corretores">
-      <h2 class="secao__titulo" id="titulo-corretores">Corretores</h2>
+      <div class="secao__cabeca">
+        <h2 class="secao__titulo" id="titulo-corretores">Corretores</h2>
+        <button type="button" class="u-botao" id="novo-corretor">Novo corretor</button>
+      </div>
       <p class="pagina__intro">Perfis acumulados a partir do YouTube e do ZAP Imóveis. Contatos lidos das descrições dos vídeos e canais. Fusão pelo canal, nome, CRECI e empresa.</p>
       <div class="filtros">
         <input type="search" id="c-busca" placeholder="Buscar por nome, empresa, CRECI ou contato" aria-label="Buscar corretores">
+        <select id="c-situacao" aria-label="Situação">
+          <option value="ativos">Ativos</option>
+          <option value="todos">Ativos e descartados</option>
+          <option value="descartados">Descartados</option>
+        </select>
         <select id="c-nivel" aria-label="Nível de maturidade">
           <option value="">Todos os níveis</option>
           <option value="3">Nível 3 · Processo aberto</option>
@@ -104,6 +115,6 @@
   </main>
 
   <script src="js/comum.js?v=8e1686803a"></script>
-  <script src="js/terrenos.js?v=07bfd82714"></script>
+  <script src="js/terrenos.js?v=4144589a1c"></script>
 </body>
 </html>

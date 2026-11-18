@@ -7,13 +7,13 @@
 const OPORTUNIDADES_URL = `${WORKER}/api/oportunidades`;
 const CORRETORES_URL = `${WORKER}/api/corretores`;
 
-const STATUS_OCULTOS = new Set(['descartado', 'abordado']);
+const STATUS_OCULTOS = new Set(['descartado', 'abordado', 'no_funil']);
 
 const NIVEL_LABELS = { 1: 'Nível 1 · Observação', 2: 'Nível 2 · Qualificado', 3: 'Nível 3 · Processo aberto' };
 const NIVEL_CURTO = { 1: 'Observação', 2: 'Qualificado', 3: 'Processo aberto' };
 const PERSONA_LABELS = { terrenista: 'Terrenista', corretor: 'Corretor' };
-const FONTE_LABELS = { 'olx.com.br': 'OLX', 'zapimoveis.com.br': 'ZAP Imóveis', 'youtube.com': 'YouTube' };
-const STATUS_LABELS = { monitorando: 'Monitorando', abordado: 'Abordado', descartado: 'Descartado' };
+const FONTE_LABELS = { 'olx.com.br': 'OLX', 'zapimoveis.com.br': 'ZAP Imóveis', 'youtube.com': 'YouTube', manual: 'Cadastro manual' };
+const STATUS_LABELS = { monitorando: 'Monitorando', abordado: 'Abordado', descartado: 'Descartado', no_funil: 'No funil' };
 
 const fonteNome = f => FONTE_LABELS[f] || f;
 
@@ -50,7 +50,7 @@ function passaOp(op) {
   if (filtrosOp.situacao === 'monitorando' && STATUS_OCULTOS.has(op.status_interno)) return false;
   if (filtrosOp.situacao === 'ocultas' && !STATUS_OCULTOS.has(op.status_interno)) return false;
   if (filtrosOp.busca) {
-    const alvo = normalizar(`${op.titulo} ${op.local} ${op.texto_bruto || ''}`);
+    const alvo = normalizar(`${op.titulo} ${op.local} ${op.texto_bruto || ''} ${op.observacoes || ''}`);
     if (!normalizar(filtrosOp.busca).split(/\s+/).filter(Boolean).every(t => alvo.includes(t))) return false;
   }
   if (!nivelBate(op.nivel_maturidade, filtrosOp.nivel)) return false;
@@ -109,18 +109,22 @@ function renderOportunidadeCard(op) {
 
   const thumb = miniaturaDe(op);
   el.innerHTML = `
-    ${thumb ? `<a href="${escapeHTML(op.link_original)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img class="oportunidade__thumb" src="${escapeHTML(thumb)}" alt="" loading="lazy" decoding="async"></a>` : ''}
+    ${thumb && op.link_original ? `<a href="${escapeHTML(op.link_original)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img class="oportunidade__thumb" src="${escapeHTML(thumb)}" alt="" loading="lazy" decoding="async"></a>` : ''}
     <div class="oportunidade__tags">
       <span class="u-etiqueta suave">${escapeHTML(PERSONA_LABELS[op.persona] || op.persona)}</span>
       ${etiquetaNivel(op.nivel_maturidade)}
+      ${STATUS_OCULTOS.has(op.status_interno) ? `<span class="u-etiqueta">${escapeHTML(STATUS_LABELS[op.status_interno])}</span>` : ''}
+      ${botaoEditar('Editar terreno')}
     </div>
-    <h3 class="oportunidade__titulo"><a href="${escapeHTML(op.link_original)}" target="_blank" rel="noopener">${escapeHTML(op.titulo)}</a></h3>
+    <h3 class="oportunidade__titulo">${linkOuTexto(op.link_original, op.titulo)}</h3>
     <p class="oportunidade__local">${escapeHTML(op.local || '')}</p>
+    ${op.observacoes ? `<p class="oportunidade__obs">${escapeHTML(op.observacoes)}</p>` : ''}
     <div class="oportunidade__rodape">
       <span>${escapeHTML(fonteNome(op.fonte))} · ${quando}</span>
       <span class="js-corretor">${corretor ? escapeHTML(corretor.nome) : ''}</span>
     </div>`;
   el.querySelector('img.oportunidade__thumb')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
+  el.querySelector('.js-editar').addEventListener('click', () => editarOportunidade(op));
   return el;
 }
 
@@ -156,7 +160,7 @@ function renderListaOp(itens) {
     <tr class="linha linha--nivel-${o.nivel_maturidade}${STATUS_OCULTOS.has(o.status_interno) ? ' is-apagado' : ''}"${o.corretor_vinculado_id ? ` data-corretor-id="${escapeHTML(o.corretor_vinculado_id)}"` : ''}>
       <td><div class="linha__concurso">
         ${miniaturaDe(o) ? `<img class="linha__banner" src="${escapeHTML(miniaturaDe(o))}" alt="" loading="lazy" decoding="async">` : '<span class="linha__banner"></span>'}
-        <div><a class="linha__titulo" href="${escapeHTML(o.link_original)}" target="_blank" rel="noopener">${escapeHTML(o.titulo)}</a>
+        <div>${linkOuTexto(o.link_original, o.titulo, 'linha__titulo')}${botaoEditar('Editar terreno', o.id)}
         ${STATUS_OCULTOS.has(o.status_interno) ? `<div class="u-apoio">${escapeHTML(STATUS_LABELS[o.status_interno])}</div>` : ''}</div></div></td>
       <td class="col-media">${etiquetaNivel(o.nivel_maturidade, true)}</td>
       <td class="col-media">${escapeHTML(PERSONA_LABELS[o.persona] || o.persona || '')}</td>
@@ -167,6 +171,10 @@ function renderListaOp(itens) {
       <td class="col-larga js-corretor">${escapeHTML(corretoresPorId[o.corretor_vinculado_id]?.nome || '')}</td>
     </tr>`).join('')}</tbody></table></div>`;
   lista.querySelectorAll('img.linha__banner').forEach(img => img.addEventListener('error', () => img.removeAttribute('src'), { once: true }));
+  lista.querySelectorAll('.js-editar').forEach(b => b.addEventListener('click', () => {
+    const o = oportunidades.find(x => x.id === b.dataset.id);
+    if (o) editarOportunidade(o);
+  }));
   ligarOrdenacao(lista.querySelector('table'), ordemOp, () => { prefGravar('terrenos:ordem', ordemOp); renderOportunidades(); });
 }
 
@@ -225,16 +233,18 @@ function atualizarCorretorNasOportunidades() {
 
 // ================================================================ CORRETORES
 
-const FILTROS_C_PADRAO = { busca: '', nivel: '', regiao: '', via: '', creci: '' };
+const FILTROS_C_PADRAO = { busca: '', situacao: 'ativos', nivel: '', regiao: '', via: '', creci: '' };
 let filtrosC = { ...FILTROS_C_PADRAO, ...prefLer('corretores:filtros', {}), busca: '' };
 const LOTE = 10;
 let corretoresMostrados = LOTE;
 
 function passaCorretor(c) {
   if (filtrosC.busca) {
-    const alvo = normalizar(`${c.nome} ${c.empresa || ''} ${c.creci || ''} ${c.instagram || ''} ${c.email || ''} ${(c.whatsapp || c.telefone || '').replace(/\D/g, '')}`);
+    const alvo = normalizar(`${c.nome} ${c.empresa || ''} ${c.creci || ''} ${c.instagram || ''} ${c.email || ''} ${c.observacoes || ''} ${(c.whatsapp || c.telefone || '').replace(/\D/g, '')}`);
     if (!normalizar(filtrosC.busca).split(/\s+/).filter(Boolean).every(t => alvo.includes(t))) return false;
   }
+  if (filtrosC.situacao === 'ativos' && c.status_interno === 'descartado') return false;
+  if (filtrosC.situacao === 'descartados' && c.status_interno !== 'descartado') return false;
   if (!nivelBate(c.nivel_maturidade, filtrosC.nivel)) return false;
   if (filtrosC.regiao && !(c.regioes_atuacao || []).includes(filtrosC.regiao)) return false;
   if (filtrosC.via && !(c.descoberto_via || []).includes(filtrosC.via)) return false;
@@ -244,7 +254,7 @@ function passaCorretor(c) {
 }
 
 function ligarFiltrosC() {
-  const campos = { busca: 'c-busca', nivel: 'c-nivel', regiao: 'c-regiao', via: 'c-via', creci: 'c-creci' };
+  const campos = { busca: 'c-busca', situacao: 'c-situacao', nivel: 'c-nivel', regiao: 'c-regiao', via: 'c-via', creci: 'c-creci' };
   for (const [k, id] of Object.entries(campos)) {
     const el = document.getElementById(id);
     el.value = filtrosC[k];
@@ -295,7 +305,7 @@ function contatosCorretor(c) {
 
 function renderCorretorCartao(c) {
   const el = document.createElement('article');
-  el.className = `corretor${c.foto_url ? ' corretor--foto' : ''}`;
+  el.className = `corretor${c.foto_url ? ' corretor--foto' : ''}${c.status_interno === 'descartado' ? ' is-apagado' : ''}`;
   const contatos = contatosCorretor(c);
   el.innerHTML = `
     ${c.foto_url ? `<img class="corretor__foto" src="${escapeHTML(c.foto_url)}" alt="" loading="lazy" decoding="async">` : ''}
@@ -308,12 +318,16 @@ function renderCorretorCartao(c) {
         ${c.volume_zap ? `<span>${plural(c.volume_zap, 'terreno', 'terrenos')} no ZAP</span>` : ''}
       </div>
       ${contatos.length ? `<div class="corretor__contatos">${contatos.join('')}</div>` : ''}
+      ${c.observacoes ? `<p class="corretor__obs">${escapeHTML(c.observacoes)}</p>` : ''}
     </div>
     <div class="corretor__selos">
+      ${c.status_interno === 'descartado' ? '<span class="u-etiqueta">Descartado</span>' : ''}
       ${c.creci ? `<span class="u-etiqueta suave">CRECI ${escapeHTML(c.creci)}</span>` : ''}
       ${etiquetaNivel(c.nivel_maturidade)}
+      ${botaoEditar('Editar corretor')}
     </div>`;
   el.querySelector('img.corretor__foto')?.addEventListener('error', e => e.target.remove(), { once: true });
+  el.querySelector('.js-editar').addEventListener('click', () => editarCorretor(c));
   return el;
 }
 
@@ -348,8 +362,8 @@ function renderListaC(itens) {
   const f = VALOR_C[ordemC.coluna] || VALOR_C.nivel;
   const ordenados = [...itens].sort((a, b) => comparar(f(a), f(b), ordemC.direcao) || comparar(VALOR_C.nome(a), VALOR_C.nome(b), 'asc'));
   lista.innerHTML = `<div class="tabela-rolagem"><table class="u-tabela tabela">${theadOrdenavel(COLUNAS_C, ordemC)}<tbody>${ordenados.map(c => `
-    <tr class="linha linha--nivel-${c.nivel_maturidade}">
-      <td><div class="linha__titulo">${escapeHTML(c.nome)}</div>${c.empresa && c.empresa !== c.nome ? `<div class="u-apoio">${escapeHTML(c.empresa)}</div>` : ''}</td>
+    <tr class="linha linha--nivel-${c.nivel_maturidade}${c.status_interno === 'descartado' ? ' is-apagado' : ''}">
+      <td><div class="linha__titulo">${escapeHTML(c.nome)}${botaoEditar('Editar corretor', c.id)}</div>${c.empresa && c.empresa !== c.nome ? `<div class="u-apoio">${escapeHTML(c.empresa)}</div>` : ''}</td>
       <td class="col-media">${etiquetaNivel(c.nivel_maturidade, true)}</td>
       <td>${escapeHTML((c.regioes_atuacao || []).join(', '))}</td>
       <td class="col-media">${escapeHTML(c.creci || '')}</td>
@@ -359,6 +373,10 @@ function renderListaC(itens) {
       <td class="col-num col-media">${(c.oportunidades_vinculadas || []).length || ''}</td>
       <td class="col-num col-larga">${formatarData(c.atualizado_em)}</td>
     </tr>`).join('')}</tbody></table></div>`;
+  lista.querySelectorAll('.js-editar').forEach(b => b.addEventListener('click', () => {
+    const c = corretoresPorId[b.dataset.id];
+    if (c) editarCorretor(c);
+  }));
   ligarOrdenacao(lista.querySelector('table'), ordemC, () => { prefGravar('corretores:ordem', ordemC); renderCorretores(); });
 }
 
@@ -421,6 +439,195 @@ function observarSecaoCorretores(forcar = false) {
   obs.observe(alvo);
 }
 
+// ================================================================ EDIÇÃO MANUAL
+//
+// Corretor e terreno podem ser corrigidos, completados e criados à mão (a coleta nem sempre traz
+// tudo). O Worker marca cada campo mexido em `campos_manuais` e a coleta não mexe mais nele.
+
+/** Lápis; com id, para listas (o clique acha o item pelo id). */
+function botaoEditar(rotulo, id = null) {
+  return `<button type="button" class="editar-nome js-editar"${id ? ` data-id="${escapeHTML(id)}"` : ''} title="${escapeHTML(rotulo)}" aria-label="${escapeHTML(rotulo)}">${LAPIS_SVG}</button>`;
+}
+
+function linkOuTexto(href, texto, classe = '') {
+  const c = classe ? ` class="${classe}"` : '';
+  return href
+    ? `<a${c} href="${escapeHTML(href)}" target="_blank" rel="noopener">${escapeHTML(texto)}</a>`
+    : `<span${c}>${escapeHTML(texto)}</span>`;
+}
+
+/**
+ * Diálogo de formulário. `campos`: { nome, rotulo, tipo ('texto'|'area'|'select'|'tel'|'email'|'url'),
+ * valor, opcoes ([[valor, rótulo]]), dica, obrigatorio, largo }. Envia só o que mudou (ou tudo, ao criar).
+ */
+function abrirFormulario({ titulo, nota, campos, criando, enviar }) {
+  let dialogo = document.getElementById('edicao-terrenos');
+  if (!dialogo) {
+    dialogo = document.createElement('dialog');
+    dialogo.id = 'edicao-terrenos';
+    dialogo.className = 'fusao edicao edicao--larga';
+    document.body.appendChild(dialogo);
+  }
+  const campoHTML = f => {
+    const v = f.valor ?? '';
+    const req = f.obrigatorio ? ' required' : '';
+    let entrada;
+    if (f.tipo === 'select') {
+      entrada = `<select name="${f.nome}"${req}>${f.opcoes.map(([val, rot]) => `<option value="${escapeHTML(val)}"${String(val) === String(v) ? ' selected' : ''}>${escapeHTML(rot)}</option>`).join('')}</select>`;
+    } else if (f.tipo === 'area') {
+      entrada = `<textarea name="${f.nome}" rows="3" maxlength="4000">${escapeHTML(v)}</textarea>`;
+    } else {
+      const tipo = { tel: 'tel', email: 'email', url: 'url' }[f.tipo] || 'text';
+      entrada = `<input type="${tipo}" name="${f.nome}" value="${escapeHTML(v)}"${req}${f.placeholder ? ` placeholder="${escapeHTML(f.placeholder)}"` : ''}>`;
+    }
+    return `<label class="u-campo${f.largo ? ' edicao__largo' : ''}"><span>${escapeHTML(f.rotulo)}</span>${entrada}${f.dica ? `<small>${escapeHTML(f.dica)}</small>` : ''}</label>`;
+  };
+  dialogo.innerHTML = `
+    <form class="fusao__form" method="dialog" novalidate>
+      <header class="fusao__topo"><h2>${escapeHTML(titulo)}</h2><button type="button" class="fusao__fechar js-cancelar" aria-label="Fechar">×</button></header>
+      <div class="fusao__corpo edicao__corpo">
+        <div class="edicao__grade">${campos.map(campoHTML).join('')}</div>
+        ${nota ? `<p class="u-apoio edicao__nota">${escapeHTML(nota)}</p>` : ''}
+        <p class="edicao__erro" role="alert" hidden></p>
+      </div>
+      <footer class="fusao__rodape">
+        <button type="button" class="u-botao js-cancelar">Cancelar</button>
+        <button type="submit" class="u-botao forte">${criando ? 'Criar' : 'Salvar'}</button>
+      </footer>
+    </form>`;
+  dialogo.querySelectorAll('.js-cancelar').forEach(b => b.addEventListener('click', () => dialogo.close()));
+  const form = dialogo.querySelector('form');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const erro = form.querySelector('.edicao__erro');
+    const corpo = {};
+    for (const f of campos) {
+      const bruto = form.elements[f.nome].value;
+      const v = f.tipo === 'area' ? bruto.trim() : bruto.replace(/\s+/g, ' ').trim();
+      if (f.obrigatorio && !v) {
+        erro.textContent = `Preencha: ${f.rotulo}.`; erro.hidden = false; return;
+      }
+      const antes = f.valor === null || f.valor === undefined ? '' : String(f.valor);
+      if (criando ? v !== '' : v !== antes) corpo[f.nome] = v === '' ? null : (f.numero ? Number(v) : v);
+    }
+    if (!Object.keys(corpo).length) { dialogo.close(); return; }
+    const botao = form.querySelector('[type=submit]');
+    botao.disabled = true; botao.textContent = criando ? 'Criando…' : 'Salvando…';
+    try {
+      await enviar(corpo);
+      dialogo.close();
+    } catch (err) {
+      erro.textContent = `Não foi possível salvar: ${err.message}`;
+      erro.hidden = false;
+      botao.disabled = false; botao.textContent = criando ? 'Criar' : 'Salvar';
+    }
+  });
+  dialogo.showModal();
+  form.elements[campos[0].nome].focus();
+}
+
+async function chamarWorker(metodo, caminho, corpo) {
+  const res = await fetch(`${WORKER}${caminho}`, {
+    method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+  });
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(r.error || `Worker respondeu ${res.status}`);
+  return r;
+}
+
+/** Atualiza um item na lista em memória e na cópia guardada, e redesenha. */
+function guardarCorretor(c) {
+  const i = corretores.findIndex(x => x.id === c.id);
+  if (i >= 0) corretores[i] = c; else corretores.push(c);
+  corretoresPorId[c.id] = c;
+  if (corretoresProntos) cacheGravar('corretores', corretores);
+}
+
+function guardarOportunidade(op) {
+  const i = oportunidades.findIndex(x => x.id === op.id);
+  if (i >= 0) oportunidades[i] = op; else oportunidades.push(op);
+  cacheGravar('oportunidades', oportunidades);
+}
+
+const OPCOES_NIVEL = [[1, NIVEL_LABELS[1]], [2, NIVEL_LABELS[2]], [3, NIVEL_LABELS[3]]];
+const NOTA_MANUAL = 'O que for corrigido aqui fica valendo: a coleta não mexe mais nesses campos.';
+
+function editarCorretor(c) {
+  const criando = !c;
+  c = c || {};
+  abrirFormulario({
+    titulo: criando ? 'Novo corretor' : 'Editar corretor',
+    criando,
+    nota: criando ? 'Corretor cadastrado à mão (indicação, contato direto…).' : NOTA_MANUAL,
+    campos: [
+      { nome: 'nome', rotulo: 'Nome', valor: c.nome, obrigatorio: true },
+      { nome: 'empresa', rotulo: 'Imobiliária / empresa', valor: c.empresa },
+      { nome: 'whatsapp', rotulo: 'WhatsApp', tipo: 'tel', valor: c.whatsapp ? formatarTelefone(c.whatsapp) : '', placeholder: '(83) 99999-9999' },
+      { nome: 'telefone', rotulo: 'Telefone', tipo: 'tel', valor: c.telefone ? formatarTelefone(c.telefone) : '' },
+      { nome: 'instagram', rotulo: 'Instagram', valor: c.instagram, placeholder: '@perfil' },
+      { nome: 'email', rotulo: 'E-mail', tipo: 'email', valor: c.email },
+      { nome: 'creci', rotulo: 'CRECI', valor: c.creci, placeholder: 'PB-12345' },
+      { nome: 'nivel_maturidade', rotulo: 'Nível', tipo: 'select', valor: c.nivel_maturidade || 1, opcoes: OPCOES_NIVEL, numero: true },
+      { nome: 'regioes_atuacao', rotulo: 'Regiões de atuação', valor: (c.regioes_atuacao || []).join(', '), dica: 'Separadas por vírgula.', largo: true },
+      ...(criando ? [] : [{ nome: 'status_interno', rotulo: 'Situação', tipo: 'select', valor: c.status_interno || 'ativo', opcoes: [['ativo', 'Ativo'], ['descartado', 'Descartado']] }]),
+      { nome: 'observacoes', rotulo: 'Observações', tipo: 'area', valor: c.observacoes, largo: true },
+    ],
+    enviar: async corpo => {
+      if ('regioes_atuacao' in corpo) corpo.regioes_atuacao = corpo.regioes_atuacao ? corpo.regioes_atuacao.split(',') : [];
+      const r = criando
+        ? await chamarWorker('POST', '/api/corretores', corpo)
+        : await chamarWorker('PATCH', `/api/corretores/${encodeURIComponent(c.id)}`, corpo);
+      guardarCorretor(r);
+      atualizarOpcoesC();
+      renderCorretores();
+      renderOportunidades();
+      notificar(criando ? 'Corretor criado.' : 'Corretor salvo.');
+    },
+  });
+}
+
+function opcoesCorretor(atualId) {
+  const lista = corretores
+    .filter(c => c.status_interno !== 'descartado' || c.id === atualId)
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map(c => [c.id, c.empresa && c.empresa !== c.nome ? `${c.nome} · ${c.empresa}` : c.nome]);
+  return [['', '— sem corretor —'], ...lista];
+}
+
+async function editarOportunidade(op) {
+  const criando = !op;
+  op = op || {};
+  // a lista de corretores pode ainda não ter vindo (a seção carrega quando entra na tela)
+  if (!corretoresProntos) await carregarComCache('corretores', CORRETORES_URL, receberCorretores);
+  abrirFormulario({
+    titulo: criando ? 'Novo terreno' : 'Editar terreno',
+    criando,
+    nota: criando ? 'Terreno cadastrado à mão (indicação, anúncio visto fora do Radar…).' : NOTA_MANUAL,
+    campos: [
+      { nome: 'titulo', rotulo: 'Título', valor: op.titulo, obrigatorio: true, largo: true },
+      { nome: 'local', rotulo: 'Local', valor: op.local, placeholder: 'Bairro, cidade' },
+      { nome: 'corretor_vinculado_id', rotulo: 'Corretor', tipo: 'select', valor: op.corretor_vinculado_id || '', opcoes: opcoesCorretor(op.corretor_vinculado_id) },
+      { nome: 'nivel_maturidade', rotulo: 'Nível', tipo: 'select', valor: op.nivel_maturidade || 1, opcoes: OPCOES_NIVEL, numero: true },
+      { nome: 'persona', rotulo: 'Quem anuncia', tipo: 'select', valor: op.persona || 'terrenista', opcoes: [['terrenista', 'Terrenista (dono)'], ['corretor', 'Corretor']] },
+      { nome: 'link_original', rotulo: 'Link do anúncio ou vídeo', tipo: 'url', valor: op.link_original, largo: true },
+      ...(criando ? [] : [{ nome: 'status_interno', rotulo: 'Situação', tipo: 'select', valor: op.status_interno || 'monitorando',
+        opcoes: [['monitorando', 'Monitorando'], ['descartado', 'Descartado'], ...(op.status_interno === 'no_funil' ? [['no_funil', 'No funil']] : [])] }]),
+      { nome: 'observacoes', rotulo: 'Observações', tipo: 'area', valor: op.observacoes, largo: true },
+    ],
+    enviar: async corpo => {
+      const r = criando
+        ? await chamarWorker('POST', '/api/oportunidades', corpo)
+        : await chamarWorker('PATCH', `/api/oportunidades/${encodeURIComponent(op.id)}`, corpo);
+      guardarOportunidade(r.oportunidade);
+      for (const c of r.corretores || []) guardarCorretor(c);
+      atualizarOpcoesOp();
+      renderOportunidades();
+      renderCorretores();
+      notificar(criando ? 'Terreno criado.' : 'Terreno salvo.');
+    },
+  });
+}
+
 // ================================================================ início
 
 function init() {
@@ -438,6 +645,9 @@ function init() {
   if (!cacheLer('oportunidades')) document.getElementById('resumo').textContent = 'Carregando oportunidades…';
   carregarComCache('oportunidades', OPORTUNIDADES_URL, receberOportunidades);
   observarSecaoCorretores();
+
+  document.getElementById('novo-terreno').addEventListener('click', () => editarOportunidade(null));
+  document.getElementById('novo-corretor').addEventListener('click', () => editarCorretor(null));
 
   const recarregar = document.getElementById('recarregar');
   recarregar.addEventListener('click', async () => {

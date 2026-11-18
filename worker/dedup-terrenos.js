@@ -106,17 +106,22 @@ function criarCorretor(candidato) {
 function fundirCorretor(existente, candidato) {
   const preencher = (a, b) => (a === null || a === undefined ? (b ?? null) : a);
   const regioes = new Set(existente.regioes_atuacao || []);
-  if (candidato.regiao) regioes.add(candidato.regiao);
+  if (candidato.regiao && !(existente.campos_manuais || []).includes('regioes_atuacao')) regioes.add(candidato.regiao);
 
-  const coletados = Object.fromEntries(CAMPOS_COLETADOS.map(k => [k, preencher(existente[k], candidato[k] ?? null)]));
+  // campos editados à mão no painel não recebem nada da coleta, nem quando ficaram vazios
+  const manuais = new Set(existente.campos_manuais || []);
+  const coletar = (k, valor) => (manuais.has(k) ? existente[k] ?? null : preencher(existente[k], valor));
+  const coletados = Object.fromEntries(CAMPOS_COLETADOS.map(k => [k, coletar(k, candidato[k] ?? null)]));
 
   return {
     ...existente,
     ...coletados,
     // o nível do corretor sobe com o sinal mais forte já visto; nunca desce sozinho
-    nivel_maturidade: Math.max(existente.nivel_maturidade || 1, candidato.nivel || 1),
-    empresa: preencher(existente.empresa, candidato.empresa),
-    creci: preencher(existente.creci, candidato.creci),
+    nivel_maturidade: manuais.has('nivel_maturidade')
+      ? existente.nivel_maturidade
+      : Math.max(existente.nivel_maturidade || 1, candidato.nivel || 1),
+    empresa: coletar('empresa', candidato.empresa),
+    creci: coletar('creci', candidato.creci),
     regioes_atuacao: [...regioes],
     volume_zap: existente.volume_zap + (candidato.fonte === 'zapimoveis.com.br' ? 1 : 0),
     descoberto_via: [...new Set([...(existente.descoberto_via || []), candidato.fonte])],

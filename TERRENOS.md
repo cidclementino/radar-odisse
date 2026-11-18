@@ -214,8 +214,26 @@ ids): `videos.list` (descrição completa) e `channels.list` (descrição do can
   primeira coleta (antes voltava a "monitorando").
 - Testes: `npm test` (`testes/terrenos.test.js`).
 
-Próximo passo: ver `universo-radar-funil` no projeto Universo (edição manual, "Levar aos
-Contatos", "Enviar ao funil").
+## Edição manual (nov/2026)
+
+A coleta nem sempre traz tudo, então terrenos e corretores podem ser corrigidos, completados e
+criados à mão no painel (lápis em cada cartão e linha; botões "Novo terreno" e "Novo corretor").
+
+- Rotas (`worker/terrenos.js`): `PATCH /api/corretores/:id`, `POST /api/corretores`,
+  `PATCH /api/oportunidades/:id`, `POST /api/oportunidades`.
+- **Corretor**: nome, empresa, WhatsApp, telefone, Instagram, e-mail, CRECI, nível, regiões,
+  observações e situação (`ativo` / `descartado`). Telefones normalizados para `+55DDNÚMERO`,
+  Instagram sem @, CRECI no formato da coleta. Criado à mão: `descoberto_via: ['manual']`.
+- **Terreno** (oportunidade): título, local, corretor ligado, nível, quem anuncia, link, observações
+  e situação (`monitorando` / `descartado`; `no_funil` fica para o "Enviar ao funil"). Trocar o
+  corretor ajusta `oportunidades_vinculadas` dos dois corretores. Criado à mão: `fonte: 'manual'`.
+- **`campos_manuais`**: todo campo mexido à mão entra nessa lista e a coleta não mexe mais nele,
+  nem quando foi esvaziado de propósito. Situação e observações nunca são tocadas pela coleta.
+  Um terreno ligado à mão a um corretor não é religado pela coleta.
+- Testes: `testes/worker-terrenos.test.mjs` (rotas + recoleta, Worker empacotado com esbuild).
+
+Próximo passo: ver `universo-radar-funil` no projeto Universo ("Levar aos Contatos",
+"Enviar ao funil").
 
 ## Pendências que restam
 
@@ -223,5 +241,4 @@ Contatos", "Enviar ao funil").
 - [ ] Validar os parsers de OLX/ZAP contra HTML real (ver ressalva acima) —
       rodar `npm run parse:olx` localmente e comparar contra o navegador.
 - [ ] Decidir o que entra em "sites especializados" (categoria ainda aberta).
-- [ ] Botões de ação nos cards de Oportunidade (marcar como abordado/descartado)
-      — hoje só editável direto no KV, mesma situação de Concursos.
+- [x] Situação e edição nos cartões de Oportunidade e de Corretor (lápis) — nov/2026.

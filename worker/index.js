@@ -44,6 +44,7 @@
 import { classificarConcursos, fundir } from './dedup.js';
 import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
+import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
 
 const CORS_HEADERS = {
@@ -507,8 +508,13 @@ async function handleCollectTerrenos(request, env) {
   // 1. Processa candidatos a Corretor primeiro — oportunidades de persona
   // "corretor" (ex: YouTube) e o enriquecimento do ZAP dependem dos ids
   // resultantes pra preencher corretor_vinculado_id.
+  // Oportunidades que já existem: o corretor ligado à mão no painel não é trocado pela coleta.
+  const existentes = await Promise.all(oportunidades.map(op => env.OPORTUNIDADES.get(op.id, 'json')));
+  const ligadasAMao = new Set(existentes.filter(a => a?.campos_manuais?.includes('corretor_vinculado_id')).map(a => a.id));
+  const candidatos = corretoresCandidatos.map(c => (ligadasAMao.has(c.oportunidade_id) ? { ...c, oportunidade_id: null } : c));
+
   const corretoresExistentes = await listAll(env.CORRETORES);
-  const { corretores: corretoresAtualizados, vinculos } = processarCandidatosCorretor(corretoresExistentes, corretoresCandidatos);
+  const { corretores: corretoresAtualizados, vinculos } = processarCandidatosCorretor(corretoresExistentes, candidatos);
 
   for (const corretor of corretoresAtualizados.values()) {
     await env.CORRETORES.put(corretor.id, JSON.stringify(corretor));
@@ -519,7 +525,6 @@ async function handleCollectTerrenos(request, env) {
   // fontes de terrenista igual à de Concurso).
   // Uma oportunidade que já existe (coletada de novo) mantém o que foi decidido no painel
   // (situação e qualquer campo que a coleta não produz) e a data da primeira coleta.
-  const existentes = await Promise.all(oportunidades.map(op => env.OPORTUNIDADES.get(op.id, 'json')));
   for (const [i, op] of oportunidades.entries()) {
     const antiga = existentes[i];
     const gravar = {
@@ -530,6 +535,9 @@ async function handleCollectTerrenos(request, env) {
     if (antiga) {
       gravar.status_interno = antiga.status_interno || op.status_interno;
       gravar.coletado_em = antiga.coletado_em || op.coletado_em;
+      // o que foi editado à mão no painel fica como está (ver worker/terrenos.js)
+      for (const k of antiga.campos_manuais || []) gravar[k] = antiga[k] ?? null;
+      for (const k of ['observacoes', 'funil']) if (k in antiga) gravar[k] = antiga[k];
     }
     await env.OPORTUNIDADES.put(op.id, JSON.stringify(gravar));
   }
@@ -736,6 +744,22 @@ async function rotear(request, env, ctx) {
 
     if (request.method === 'GET' && url.pathname === '/api/corretores') {
       return json(await listarRapido(env.CORRETORES, ctx, fresco));
+    }
+
+    // Terrenos: edição manual e criação à mão (worker/terrenos.js)
+    if (request.method === 'POST' && url.pathname === '/api/corretores') {
+      return criarCorretorManual(request, env, json);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/oportunidades') {
+      return criarOportunidadeManual(request, env, json);
+    }
+    const matchCorretor = url.pathname.match(/^\/api\/corretores\/([^/]+)$/);
+    if (request.method === 'PATCH' && matchCorretor) {
+      return patchCorretor(request, env, decodeURIComponent(matchCorretor[1]), json);
+    }
+    const matchOportunidade = url.pathname.match(/^\/api\/oportunidades\/([^/]+)$/);
+    if (request.method === 'PATCH' && matchOportunidade) {
+      return patchOportunidade(request, env, decodeURIComponent(matchOportunidade[1]), json);
     }
 
     if (request.method === 'POST' && url.pathname === '/api/collect-terrenos') {

@@ -1,13 +1,17 @@
 name: Sondar fontes candidatas
 
 # Só manual. Verifica sites candidatos a fonte (feed, API do WordPress, publicações sobre concurso)
-# e imprime um relatório no log. Não grava nada.
+# ou roda um parser sem enviar nada ao Radar, e imprime o resultado no log. Não grava nada.
 
 on:
   workflow_dispatch:
     inputs:
       sites:
         description: 'Domínios separados por espaço (vazio = lista padrão do script)'
+        required: false
+        default: ''
+      parser:
+        description: 'Em vez de sondar, testar um parser (ex.: iab, bustler)'
         required: false
         default: ''
 
@@ -19,7 +23,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Sondar
+      - run: npm ci
+      - name: Sondar ou testar parser
         env:
           SITES: ${{ inputs.sites }}
-        run: node scripts/sondar-fontes.js
+          PARSER: ${{ inputs.parser }}
+        run: |
+          if [ -n "$PARSER" ]; then
+            [[ "$PARSER" =~ ^[a-z0-9-]+$ ]] || { echo "::error::nome de parser inválido"; exit 1; }
+            node "parsers/$PARSER.js"
+          else
+            node scripts/sondar-fontes.js
+          fi

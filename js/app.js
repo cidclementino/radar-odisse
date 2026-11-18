@@ -215,66 +215,26 @@ function renderDetalhe(c) {
     </div>`;
 }
 
-// ---------------------------------------------------------------- nome editável
+// ---------------------------------------------------------------- edição (lápis)
 //
-// O lápis ao lado do título deixa trocar o nome exibido (`apelido`) ali mesmo: Enter ou clicar fora
-// salva, Esc desiste. O nome capturado na fonte (`nome`) não muda e aparece ao parar o cursor no título.
-
-const PENCIL = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M11.3 1.8a1.6 1.6 0 0 1 2.3 0l.6.6a1.6 1.6 0 0 1 0 2.3L5.5 13.4l-3.3.8.8-3.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 3.1l2.9 2.9" stroke="currentColor" stroke-width="1.4"/></svg>';
-
-const BOTAO_EDITAR_NOME = `<button type="button" class="editar-nome js-editar-nome" title="Editar nome" aria-label="Editar nome">${PENCIL}</button>`;
+// O lápis abre o diálogo de nome e datas (abrirEdicaoConcurso, em comum.js). O nome capturado na
+// fonte aparece ao parar o cursor no título quando foi trocado.
 
 function nomeSpan(c) {
   const titulo = c.apelido && c.apelido !== c.nome ? ` title="Nome na fonte: ${escapeHTML(c.nome)}"` : '';
-  return `<span class="js-nome" data-nome-id="${escapeHTML(c.id)}"${titulo}>${escapeHTML(nomeExibido(c))}</span>`;
+  return `<span class="js-nome"${titulo}>${escapeHTML(nomeExibido(c))}</span>`;
 }
 
 /** na lista o lápis fica logo depois do nome; no cartão ele fica no canto, na linha das etiquetas */
-const nomeEditavel = c => nomeSpan(c) + BOTAO_EDITAR_NOME;
+const nomeEditavel = c => nomeSpan(c) + BOTAO_EDITAR;
 
-function ligarEdicaoNome(raiz, c) {
-  const botao = raiz.querySelector('.js-editar-nome');
-  const span = raiz.querySelector('.js-nome');
-  if (!botao || !span) return;
-  const parar = e => e.stopPropagation();
-  botao.addEventListener('keydown', parar);
+function ligarEdicao(raiz, c) {
+  const botao = raiz.querySelector('.js-editar');
+  if (!botao) return;
+  botao.addEventListener('keydown', e => e.stopPropagation());
   botao.addEventListener('click', e => {
     e.stopPropagation();
-    if (span.isContentEditable) return;
-    const antes = span.textContent;
-    let terminou = false;
-    span.contentEditable = 'plaintext-only';
-    span.classList.add('is-editando');
-    span.focus();
-    const sel = getSelection(); const r = document.createRange(); r.selectNodeContents(span); sel.removeAllRanges(); sel.addRange(r);
-
-    const fim = async salvar => {
-      if (terminou) return;
-      terminou = true;
-      span.contentEditable = 'false';
-      span.classList.remove('is-editando');
-      span.removeEventListener('keydown', teclas);
-      span.removeEventListener('click', parar);
-      const apelido = span.textContent.replace(/\s+/g, ' ').trim();
-      if (!salvar || !apelido || apelido === antes) { span.textContent = antes; return; }
-      const atualizado = await patchConcurso(c.id, { apelido }, 'Não foi possível salvar o nome agora. Tente de novo em instantes.');
-      if (!atualizado) { span.textContent = antes; return; }
-      substituir(atualizado);
-      Object.assign(c, atualizado);
-      // renomear não muda ordem nem visibilidade: atualiza só o nome onde ele aparece, sem redesenhar
-      document.querySelectorAll(`.js-nome[data-nome-id="${CSS.escape(c.id)}"]`).forEach(el => {
-        el.textContent = nomeExibido(atualizado);
-        if (atualizado.apelido !== atualizado.nome) el.title = `Nome na fonte: ${atualizado.nome}`; else el.removeAttribute('title');
-      });
-    };
-    const teclas = ev => {
-      ev.stopPropagation();
-      if (ev.key === 'Enter') { ev.preventDefault(); span.blur(); }
-      if (ev.key === 'Escape') { ev.preventDefault(); fim(false); }
-    };
-    span.addEventListener('keydown', teclas);
-    span.addEventListener('click', parar);
-    span.addEventListener('blur', () => fim(true), { once: true });
+    abrirEdicaoConcurso(c, atualizado => { substituir(atualizado); render(); });
   });
 }
 
@@ -368,7 +328,7 @@ function renderCard(c) {
       ${situacao ? `<span class="u-etiqueta">${escapeHTML(situacao)}</span>` : ''}
     </div>
     <div class="concurso__corpo">
-      <div class="concurso__topo"><div class="concurso__tags">${tags}</div>${BOTAO_EDITAR_NOME}</div>
+      <div class="concurso__topo"><div class="concurso__tags">${tags}</div>${BOTAO_EDITAR}</div>
       <h2 class="concurso__titulo">${nomeSpan(c)}</h2>
       <p class="concurso__local">${escapeHTML(c.local_projeto || '')}</p>
     </div>
@@ -402,7 +362,7 @@ function renderCard(c) {
   // imagem que não carrega vira o mesmo fundo neutro dos concursos sem banner
   el.querySelector('img.concurso__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
   ligarDetalhe(el, c);
-  ligarEdicaoNome(el, c);
+  ligarEdicao(el, c);
   return el;
 }
 
@@ -511,7 +471,7 @@ function renderLista(itens) {
     });
     tr.querySelector('img.linha__banner')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
     ligarDetalhe(det, c);
-    ligarEdicaoNome(tr, c);
+    ligarEdicao(tr, c);
     tbody.append(tr, det);
   }
 

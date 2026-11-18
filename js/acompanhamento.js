@@ -86,7 +86,7 @@ function renderCartao(c) {
   else estadoLeitura = '<span class="u-apoio">Site ainda não lido</span>';
 
   el.innerHTML = `
-    ${temCorpo ? `<button type="button" class="acomp__alternar js-alternar" aria-expanded="${abertos.has(c.id)}" aria-label="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}" title="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}"></button>` : ''}
+    <div class="acomp__cantos">${BOTAO_EDITAR}${temCorpo ? `<button type="button" class="acomp__alternar js-alternar" aria-expanded="${abertos.has(c.id)}" aria-label="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}" title="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}"></button>` : ''}</div>
     <div class="acomp__topo">
       ${imagem ? `<img class="acomp__banner" src="${escapeHTML(imagem)}" alt="" loading="lazy" decoding="async">` : '<div class="acomp__banner"></div>'}
       <div class="acomp__cabeca">
@@ -100,6 +100,9 @@ function renderCartao(c) {
           </select>
           ${link ? `<a class="u-botao" href="${escapeHTML(link)}" target="_blank" rel="noopener">Site oficial ↗</a>` : ''}
           <button type="button" class="u-botao js-reler"${lendoSite.has(c.id) ? ' disabled' : ''}>Ler o site de novo</button>
+          ${c.projeto?.id
+            ? `<a class="u-botao" href="https://projetos.odisse.com.br/projeto.html#${escapeHTML(c.projeto.id)}" target="_blank" rel="noopener" title="Enviado ao Projetos em ${escapeHTML(formatarData(c.projeto.enviado_em))}">Ver no Projetos · ${escapeHTML(c.projeto.codigo || '')} ↗</a>`
+            : '<button type="button" class="u-botao forte js-enviar-projeto">Enviar ao Projetos</button>'}
         </div>
         <div class="acomp__leitura">${estadoLeitura}</div>
       </div>
@@ -136,6 +139,8 @@ function renderCartao(c) {
     }
   });
   el.querySelector('.js-reler').addEventListener('click', () => ler(c, true));
+  el.querySelector('.js-enviar-projeto')?.addEventListener('click', () => abrirEnvioProjeto(c));
+  el.querySelector('.js-editar').addEventListener('click', () => abrirEdicaoConcurso(c, atualizado => { substituir(atualizado); render(); }));
   el.querySelector('.js-alternar')?.addEventListener('click', e => {
     const aberto = !abertos.has(c.id);
     if (aberto) abertos.add(c.id); else abertos.delete(c.id);
@@ -146,6 +151,82 @@ function renderCartao(c) {
     e.currentTarget.title = rotulo;
   });
   return el;
+}
+
+// ---------------------------------------------------------------- enviar ao Projetos
+//
+// Mostra antes o que vai ser criado (o Worker monta a prévia: datas, etapas do PGT, avisos) e só cria
+// depois da confirmação. Regras em worker/projetos.js.
+
+async function abrirEnvioProjeto(c) {
+  let dialogo = document.getElementById('envio-projeto');
+  if (!dialogo) {
+    dialogo = document.createElement('dialog');
+    dialogo.id = 'envio-projeto';
+    dialogo.className = 'fusao edicao envio';
+    document.body.appendChild(dialogo);
+  }
+  const url = `${WORKER}/api/concursos/${encodeURIComponent(c.id)}/projeto`;
+  dialogo.innerHTML = `<div class="fusao__form"><header class="fusao__topo"><h2>Enviar ao Projetos</h2><button type="button" class="fusao__fechar js-cancelar" aria-label="Fechar">×</button></header>
+    <div class="fusao__corpo"><p class="u-apoio">Montando a prévia com o Plano Geral de Trabalho…</p></div></div>`;
+  dialogo.querySelector('.js-cancelar').addEventListener('click', () => dialogo.close());
+  dialogo.showModal();
+
+  let p;
+  try {
+    const res = await fetch(url);
+    p = await res.json();
+    if (!res.ok) throw new Error(p.error || `Worker respondeu ${res.status}`);
+  } catch (err) {
+    dialogo.querySelector('.fusao__corpo').innerHTML = `<p class="edicao__erro">Não foi possível montar a prévia: ${escapeHTML(err.message)}</p>`;
+    return;
+  }
+  const bloqueado = p.bloqueios.length > 0;
+  const lista = items => items.map(t => `<li>${escapeHTML(t)}</li>`).join('');
+  dialogo.innerHTML = `
+    <form class="fusao__form" method="dialog">
+      <header class="fusao__topo"><h2>Enviar ao Projetos</h2><button type="button" class="fusao__fechar js-cancelar" aria-label="Fechar">×</button></header>
+      <div class="fusao__corpo envio__corpo">
+        ${bloqueado ? `<ul class="envio__bloqueios">${lista(p.bloqueios)}</ul>` : ''}
+        <dl class="envio__dados">
+          <dt>Projeto</dt><dd>${escapeHTML(p.projeto.nome)}</dd>
+          <dt>Código</dt><dd>próximo número da sequência (OA-${escapeHTML(p.inicio.slice(0, 4))}-…)</dd>
+          <dt>Núcleo</dt><dd>Odisse Arquitetos · sem cliente · serviço Concurso</dd>
+          <dt>Início</dt><dd>${escapeHTML(formatarData(p.inicio))}</dd>
+          <dt>Data limite</dt><dd>${p.limite ? `${escapeHTML(formatarData(p.limite))} <span class="u-apoio">(1 dia antes ${p.usouInscricao ? 'do fim das inscrições' : 'da entrega'}, ${escapeHTML(formatarData(p.prazo))})</span>` : '—'}</dd>
+        </dl>
+        <h3 class="envio__titulo">Etapas do PGT para Concurso${p.pgt_numero ? ` <span class="u-apoio">(publicação nº ${escapeHTML(String(p.pgt_numero))})</span>` : ''}</h3>
+        ${p.etapas.length ? `<ol class="envio__etapas">${p.etapas.map(e => `<li><span>${escapeHTML(e.sigla ? `${e.sigla} · ` : '')}${escapeHTML(e.nome)}</span><span class="u-apoio">${e.semanas ? `${String(e.semanas).replace('.', ',')} sem.` : 'sem prazo'}</span></li>`).join('')}</ol>
+          ${p.fim_fluxo ? `<p class="u-apoio">Seguindo o fluxo padrão, termina em ${escapeHTML(formatarData(p.fim_fluxo))}.</p>` : ''}` : '<p class="u-apoio">Nenhuma etapa.</p>'}
+        ${p.avisos.length ? `<ul class="envio__avisos">${lista(p.avisos)}</ul>` : ''}
+        <p class="edicao__erro" role="alert" hidden></p>
+      </div>
+      <footer class="fusao__rodape">
+        <button type="button" class="u-botao js-cancelar">Cancelar</button>
+        <button type="submit" class="u-botao forte"${bloqueado ? ' disabled' : ''}>Criar projeto</button>
+      </footer>
+    </form>`;
+  dialogo.querySelectorAll('.js-cancelar').forEach(b => b.addEventListener('click', () => dialogo.close()));
+  const form = dialogo.querySelector('form');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const botao = form.querySelector('[type=submit]');
+    const erro = form.querySelector('.edicao__erro');
+    botao.disabled = true; botao.textContent = 'Criando…';
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.error || `Worker respondeu ${res.status}`);
+      dialogo.close();
+      substituir(r);
+      render();
+      notificar(`Projeto ${r.projeto.codigo} criado no Projetos. O concurso passou para Inscrito.`, { ms: 7000 });
+    } catch (err) {
+      erro.textContent = `Não foi possível criar o projeto: ${err.message}`;
+      erro.hidden = false;
+      botao.disabled = false; botao.textContent = 'Criar projeto';
+    }
+  });
 }
 
 function visiveis() {

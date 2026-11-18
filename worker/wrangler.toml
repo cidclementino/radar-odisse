@@ -13,3 +13,14 @@ kv_namespaces = [
 
 # Defina com: wrangler secret put COLLECT_SECRET
 # (não coloque o valor real aqui — isso fica no dashboard/CLI da Cloudflare)
+
+# Senha do painel (RADAR_SENHA): secret do Worker, enviado pelo workflow a partir do secret do
+# repositório com o mesmo nome. Nunca aqui.
+
+# Universo: banco comum (D1) pelo Worker do hub, ponto de entrada "Projetos" — usado para enviar um
+# concurso em acompanhamento ao projetos.odisse (worker/projetos.js). Só outro Worker da mesma conta
+# alcança esse ponto de entrada; não passa pela internet.
+[[services]]
+binding = "PROJETOS"
+service = "universo-hub"
+entrypoint = "Projetos"

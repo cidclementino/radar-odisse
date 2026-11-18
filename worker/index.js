@@ -22,7 +22,17 @@
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
 //
-// NOTA DE SEGURANÇA: as rotas PATCH/DELETE de Concursos não exigem
+// SENHA (nov/2026): todas as rotas exigem `Authorization: Bearer <RADAR_SENHA>` (a senha do painel,
+// secret do Worker, como nas outras ferramentas do Odisse) ou `Bearer <COLLECT_SECRET>` (coleta no
+// GitHub Actions). Sem RADAR_SENHA configurada, o Worker recusa tudo (falha fechada).
+// GET /estado só confere a senha (tela de login).
+//
+// PROJETOS: o Worker fala com a API do Universo pelo service binding PROJETOS (universo-hub, ponto
+// de entrada "Projetos") para criar um projeto a partir de um concurso em acompanhamento:
+//   GET  /api/concursos/:id/projeto  -> prévia do que será criado (datas, etapas do PGT, avisos)
+//   POST /api/concursos/:id/projeto  -> cria o projeto e marca o concurso como inscrito
+//
+// NOTA ANTIGA (antes da senha): as rotas PATCH/DELETE de Concursos não exigem
 // autenticação, assim como o resto do painel (não há login hoje — ver
 // README, seção "Próxima rodada"). Qualquer pessoa com a URL do painel
 // pode descartar ou apagar itens. Isso é uma decisão consciente pra manter
@@ -34,6 +44,7 @@
 import { classificarConcursos, fundir } from './dedup.js';
 import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
+import { planejar, criarProjeto } from './projetos.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -150,8 +161,8 @@ async function handlePatchConcurso(request, env, id) {
   }
   body = body || {};
 
-  if (!('status_interno' in body) && !('apelido' in body) && !('acompanhamento' in body) && !('completar' in body)) {
-    return json({ error: 'nada pra atualizar — envie status_interno, apelido, acompanhamento ou completar' }, 400);
+  if (!['status_interno', 'apelido', 'acompanhamento', 'completar', 'datas'].some(k => k in body)) {
+    return json({ error: 'nada pra atualizar — envie status_interno, apelido, datas, acompanhamento ou completar' }, 400);
   }
 
   const atualizado = { ...existente, atualizado_em: new Date().toISOString() };
@@ -169,6 +180,21 @@ async function handlePatchConcurso(request, env, id) {
       return json({ error: 'apelido não pode ser vazio — envie o nome original se quiser resetar' }, 400);
     }
     atualizado.apelido = apelido;
+  }
+
+  // Correção manual das datas (lápis). Cada campo enviado vira a data dada ou vazio (null).
+  // `datas_manuais` impede que a coleta e o conserto automático mexam nelas depois.
+  if ('datas' in body) {
+    const d = body.datas;
+    if (!d || typeof d !== 'object') return json({ error: 'datas deve ser um objeto' }, 400);
+    const novas = { ...(atualizado.datas || {}) };
+    for (const k of ['inscricao_fim', 'entrega_fim']) {
+      if (!(k in d)) continue;
+      if (d[k] !== null && !dataValida(d[k])) return json({ error: `${k}: use AAAA-MM-DD ou null` }, 400);
+      novas[k] = d[k];
+    }
+    atualizado.datas = novas;
+    atualizado.datas_manuais = true;
   }
 
   if ('acompanhamento' in body) {
@@ -205,6 +231,7 @@ function aplicarCompletar(alvo, campos) {
     if (vazio(alvo[k]) && texto(campos[k])) alvo[k] = texto(campos[k]);
   }
   alvo.datas = { ...(alvo.datas || {}) };
+  if (alvo.datas_manuais) return alvo; // datas corrigidas à mão não são completadas
   for (const k of ['inscricao_fim', 'entrega_fim', 'resultado_previsto']) {
     if (!dataValida(alvo.datas[k]) && dataValida(campos[k])) alvo.datas[k] = campos[k];
   }
@@ -270,6 +297,7 @@ async function handleReparar(request, env) {
   const todos = await listAll(env.CONCURSOS);
   const consertados = [];
   for (const c of todos) {
+    if (c.datas_manuais) continue; // datas corrigidas à mão ficam como estão
     const novo = repararDatas(c);
     if (novo) {
       await env.CONCURSOS.put(novo.id, JSON.stringify({ ...novo, atualizado_em: new Date().toISOString() }));
@@ -585,8 +613,45 @@ async function aplicarNaCopia(env, nome, mudancas) {
   await gravarCopia(kv, copia);
 }
 
+/**
+ * GET  /api/concursos/:id/projeto -> prévia (ver worker/projetos.js)
+ * POST /api/concursos/:id/projeto -> cria o projeto, marca o concurso como inscrito e guarda o projeto nele
+ */
+async function handleProjeto(request, env, id) {
+  const c = await env.CONCURSOS.get(id, 'json');
+  if (!c) return json({ error: 'concurso não encontrado' }, 404);
+  try {
+    if (request.method === 'GET') return json(await planejar(env, c));
+    const { projeto } = await criarProjeto(env, c);
+    const atualizado = {
+      ...c, status_interno: 'inscrito', atualizado_em: new Date().toISOString(),
+      projeto: { ...projeto, enviado_em: new Date().toISOString() },
+    };
+    await env.CONCURSOS.put(id, JSON.stringify(atualizado));
+    return json(atualizado);
+  } catch (err) {
+    return json({ error: err.message }, err.status && err.status < 600 ? err.status : 500);
+  }
+}
+
+function iguais(a, b) {
+  const ea = new TextEncoder().encode(a);
+  const eb = new TextEncoder().encode(b);
+  let dif = ea.length ^ eb.length;
+  for (let i = 0; i < Math.max(ea.length, eb.length); i++) dif |= (ea[i] || 0) ^ (eb[i] || 0);
+  return dif === 0;
+}
+
 export default {
   async fetch(request, env, ctx) {
+    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
+    // senha do painel ou segredo da coleta; sem a senha configurada, recusa tudo
+    if (!env.RADAR_SENHA) return json({ error: 'senha do servidor não configurada' }, 503);
+    const auth = request.headers.get('Authorization') || '';
+    const ok = iguais(auth, `Bearer ${env.RADAR_SENHA}`) || (env.COLLECT_SECRET && iguais(auth, `Bearer ${env.COLLECT_SECRET}`));
+    if (!ok) return json({ error: 'senha incorreta' }, 401);
+    if (new URL(request.url).pathname === '/estado') return json({ ok: true });
+
     const { envRastreado, mudancas } = rastrear(env);
     const resposta = await rotear(request, envRastreado, ctx);
     const nomes = Object.keys(mudancas);
@@ -600,10 +665,6 @@ export default {
 async function rotear(request, env, ctx) {
     const url = new URL(request.url);
     const fresco = url.searchParams.get('fresco') === '1';
-
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
 
     if (request.method === 'GET' && url.pathname === '/api/concursos') {
       return json(await listarRapido(env.CONCURSOS, ctx, fresco));
@@ -631,6 +692,11 @@ async function rotear(request, env, ctx) {
 
     if (request.method === 'POST' && url.pathname === '/api/manutencao/completar') {
       return handleCompletar(request, env);
+    }
+
+    const matchProjeto = url.pathname.match(/^\/api\/concursos\/([^/]+)\/projeto$/);
+    if (matchProjeto && ['GET', 'POST'].includes(request.method)) {
+      return handleProjeto(request, env, decodeURIComponent(matchProjeto[1]));
     }
 
     const matchSite = url.pathname.match(/^\/api\/concursos\/([^/]+)\/site$/);

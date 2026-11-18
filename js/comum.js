@@ -8,6 +8,23 @@
 
 const WORKER = 'https://radar-odisse.reservaprojectbasework.workers.dev';
 
+// ---------------------------------------------------------------- senha
+//
+// Toda chamada ao Worker leva a senha guardada no login (js/auth.js). Se o Worker recusar
+// (senha trocada), a pessoa volta ao login.
+(function autenticarChamadas() {
+  const original = window.fetch.bind(window);
+  window.fetch = async (entrada, opcoes = {}) => {
+    const url = typeof entrada === 'string' ? entrada : entrada.url;
+    if (!url.startsWith(WORKER)) return original(entrada, opcoes);
+    const headers = new Headers(opcoes.headers || {});
+    headers.set('Authorization', `Bearer ${getSenha()}`);
+    const res = await original(entrada, { ...opcoes, headers });
+    if (res.status === 401) senhaRecusada();
+    return res;
+  };
+})();
+
 // ---------------------------------------------------------------- barra
 
 // Endereços limpos: quem abrir um link antigo (terrenos.html, index.html) vê o endereço sem o ".html".
@@ -34,7 +51,8 @@ if (/\.html$/.test(location.pathname)) {
     <nav class="topo__secoes" aria-label="Seções do Radar">
       ${SECOES.map(s => `<a href="${s.href}"${s.id === pagina ? ' class="is-current" aria-current="page"' : ''}>${s.nome}</a>`).join('')}
     </nav>
-    <div class="topo__direita"><span data-universo-menu></span></div>`;
+    <div class="topo__direita"><a class="topo__sair" href="/login" title="${escapeHTML(getUserName() ? `Conectado como ${getUserName()}` : 'Sair do Radar')}">Sair</a><span data-universo-menu></span></div>`;
+  raiz.querySelector('.topo__sair').addEventListener('click', () => logout());
   const s = document.createElement('script');
   s.src = 'https://universo.odisse.com.br/base/v1/barra.js';
   s.defer = true;
@@ -304,4 +322,77 @@ function notificar(texto, { erro = false, ms = 4500 } = {}) {
   el.hidden = false;
   clearTimeout(el._t);
   if (ms) el._t = setTimeout(() => { el.hidden = true; }, ms);
+}
+
+// ---------------------------------------------------------------- edição do concurso (lápis)
+//
+// Nome exibido e datas, num diálogo pequeno. Usado em Monitoramento geral e Acompanhamento.
+// Datas corrigidas à mão ficam marcadas no Worker (`datas_manuais`) e a coleta não mexe mais nelas.
+
+const LAPIS_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M11.3 1.8a1.6 1.6 0 0 1 2.3 0l.6.6a1.6 1.6 0 0 1 0 2.3L5.5 13.4l-3.3.8.8-3.3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 3.1l2.9 2.9" stroke="currentColor" stroke-width="1.4"/></svg>';
+const BOTAO_EDITAR = `<button type="button" class="editar-nome js-editar" title="Editar nome e datas" aria-label="Editar nome e datas">${LAPIS_SVG}</button>`;
+
+function abrirEdicaoConcurso(c, aoSalvar) {
+  let dialogo = document.getElementById('edicao-concurso');
+  if (!dialogo) {
+    dialogo = document.createElement('dialog');
+    dialogo.id = 'edicao-concurso';
+    dialogo.className = 'fusao edicao';
+    document.body.appendChild(dialogo);
+  }
+  const d = c.datas || {};
+  const nomeAtual = c.apelido || c.nome || '';
+  dialogo.innerHTML = `
+    <form class="fusao__form" method="dialog">
+      <header class="fusao__topo"><h2>Editar concurso</h2><button type="button" class="fusao__fechar js-cancelar" aria-label="Fechar">×</button></header>
+      <div class="fusao__corpo edicao__corpo">
+        <label class="u-campo"><span>Nome exibido</span>
+          <input type="text" name="nome" maxlength="200" required value="${escapeHTML(nomeAtual)}">
+          ${c.nome && c.nome !== nomeAtual ? `<small>Nome na fonte: ${escapeHTML(c.nome)}</small>` : ''}</label>
+        <div class="edicao__datas">
+          <label class="u-campo"><span>Fim das inscrições</span><input type="date" name="inscricao_fim" value="${escapeHTML(d.inscricao_fim || '')}"></label>
+          <label class="u-campo"><span>Entrega das propostas</span><input type="date" name="entrega_fim" value="${escapeHTML(d.entrega_fim || '')}"></label>
+        </div>
+        <p class="u-apoio edicao__nota">${c.datas_manuais ? 'As datas já foram corrigidas à mão: a coleta não mexe nelas.' : 'Ao corrigir uma data, a coleta deixa de mexer nas datas deste concurso.'}</p>
+        <p class="edicao__erro" role="alert" hidden></p>
+      </div>
+      <footer class="fusao__rodape">
+        <button type="button" class="u-botao js-cancelar">Cancelar</button>
+        <button type="submit" class="u-botao forte">Salvar</button>
+      </footer>
+    </form>`;
+  dialogo.querySelectorAll('.js-cancelar').forEach(b => b.addEventListener('click', () => dialogo.close()));
+  const form = dialogo.querySelector('form');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const corpo = {};
+    const nome = form.nome.value.replace(/\s+/g, ' ').trim();
+    if (nome && nome !== nomeAtual) corpo.apelido = nome;
+    const datas = {};
+    for (const k of ['inscricao_fim', 'entrega_fim']) {
+      const v = form[k].value || null;
+      if (v !== (d[k] || null)) datas[k] = v;
+    }
+    if (Object.keys(datas).length) corpo.datas = datas;
+    if (!Object.keys(corpo).length) { dialogo.close(); return; }
+    const botao = form.querySelector('[type=submit]');
+    const erro = form.querySelector('.edicao__erro');
+    botao.disabled = true; botao.textContent = 'Salvando…';
+    try {
+      const res = await fetch(`${WORKER}/api/concursos/${encodeURIComponent(c.id)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+      });
+      const r = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(r.error || `Worker respondeu ${res.status}`);
+      dialogo.close();
+      aoSalvar(r);
+    } catch (err) {
+      erro.textContent = `Não foi possível salvar: ${err.message}`;
+      erro.hidden = false;
+      botao.disabled = false; botao.textContent = 'Salvar';
+    }
+  });
+  dialogo.showModal();
+  form.nome.focus();
+  form.nome.select();
 }

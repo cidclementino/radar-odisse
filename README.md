@@ -121,6 +121,20 @@ Em Settings → Secrets and variables → Actions, adicione:
 - `RADAR_COLLECT_SECRET` — o mesmo valor definido em `wrangler secret put`
 - `YOUTUBE_API_KEY` — chave da YouTube Data API v3 (Google Cloud Console),
   só usada pelo workflow de Terrenos
+- `RADAR_SENHA` — senha do painel (tela de login), como nas outras ferramentas do Odisse. O workflow
+  `worker.yml` a envia ao Worker. Sem ela o Worker recusa tudo. Trocar a senha: atualizar o secret e
+  rodar "Publicar Worker do Radar".
+
+## Senha e envio ao Projetos
+
+- Todas as rotas do Worker exigem `Authorization: Bearer <RADAR_SENHA>` (painel) ou
+  `Bearer <RADAR_COLLECT_SECRET>` (coleta). O painel guarda a senha no navegador depois do login
+  (`login.html`, `js/auth.js`) e `js/comum.js` a põe em toda chamada ao Worker.
+- O Acompanhamento envia um concurso ao projetos.odisse como projeto ativo (`worker/projetos.js`): o
+  Worker fala com o Universo pelo service binding `PROJETOS` (universo-hub, ponto de entrada
+  "Projetos"). Regras: núcleo Arquitetos, sem cliente, serviço Concurso, início no dia seguinte,
+  previsão de fim 1 dia antes da entrega (ou do fim das inscrições), etapas do PGT publicado que valem
+  para o serviço Concurso. O concurso vira "inscrito" e guarda o projeto criado.
 
 Concursos roda semanalmente (segunda, 08:00 UTC); Terrenos roda diariamente
 em dias úteis (09:00 UTC), pra acompanhar a rotação de região do YouTube.

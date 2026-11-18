@@ -19,7 +19,7 @@ const parsers = require('../parsers');
  */
 async function buscarIdsConhecidos(workerUrl) {
   try {
-    const res = await fetch(`${workerUrl}/api/concursos`);
+    const res = await fetch(`${workerUrl}/api/concursos`, { headers: { Authorization: `Bearer ${process.env.COLLECT_SECRET}` } });
     if (!res.ok) throw new Error(`status ${res.status}`);
     const existentes = await res.json();
     return new Set(existentes.map(c => c.id));

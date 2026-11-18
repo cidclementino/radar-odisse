@@ -62,7 +62,7 @@ async function main() {
   const reparo = await fetch(`${WORKER_URL}/api/manutencao/reparar`, { method: 'POST', headers: autorizacao }).then(r => r.json());
   console.log('Datas consertadas a partir do texto da fonte:', reparo);
 
-  const concursos = await fetch(`${WORKER_URL}/api/concursos`).then(r => r.json());
+  const concursos = await fetch(`${WORKER_URL}/api/concursos`, { headers: autorizacao }).then(r => r.json());
   const hoje = new Date().toISOString().slice(0, 10);
   const aberto = c => !c.datas?.inscricao_fim || c.datas.inscricao_fim >= hoje;
 

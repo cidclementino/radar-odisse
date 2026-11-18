@@ -449,8 +449,10 @@ select.situacao--descartado { color: var(--tinta-2); }
 .acompanhados { display: flex; flex-direction: column; gap: 16px; }
 .acomp { position: relative; background: var(--elevada); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
 .acomp:not(.is-aberto) .acomp__corpo { display: none; }
+.acomp__cantos { position: absolute; top: 10px; right: 10px; z-index: 1; display: flex; gap: 6px; align-items: center; }
+.acomp__cantos .editar-nome { opacity: 1; width: 32px; height: 32px; margin: 0; border-color: var(--linha); background: var(--elevada); }
 .acomp__alternar {
-  position: absolute; top: 10px; right: 10px; z-index: 1; width: 32px; height: 32px; padding: 0;
+  width: 32px; height: 32px; padding: 0;
   display: grid; place-items: center; cursor: pointer;
   background: var(--elevada); border: 1px solid var(--linha); border-radius: var(--raio-p); color: var(--tinta-2);
 }
@@ -460,7 +462,7 @@ select.situacao--descartado { color: var(--tinta-2); }
 }
 .acomp.is-aberto .acomp__alternar::before { transform: rotate(-135deg); margin-top: 4px; }
 .acomp__alternar:hover { border-color: var(--tinta-2); color: var(--tinta); }
-.acomp__cabeca { padding-right: 56px; }
+.acomp__cabeca { padding-right: 96px; }
 .acomp__topo { display: grid; grid-template-columns: 280px 1fr; gap: 0; }
 .acomp__banner { display: block; width: 100%; height: 100%; min-height: 180px; max-height: 240px; object-fit: cover; background: var(--nevoa); border-right: 1px solid var(--linha); }
 .acomp__cabeca { padding: 16px 18px; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -500,3 +502,57 @@ select.situacao--descartado { color: var(--tinta-2); }
   .linha-tempo li { grid-template-columns: 90px 1fr; }
   .linha-tempo__trecho { grid-column: 1 / -1; white-space: normal; }
 }
+}
+
+/* ==========================================================================
+   ENTRADA (senha) — como a entrada do Universo
+   ========================================================================== */
+.gate { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 12vh 20px 40px; }
+.gate__card {
+  width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px;
+  padding: 32px 24px 24px; background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio);
+}
+.gate__marca { display: flex; align-items: center; justify-content: center; gap: 14px; color: var(--tinta); }
+.gate__selo { width: 30px; height: 50px; background: currentColor;
+  -webkit-mask: url(https://marca.odisse.com.br/selos/mao.svg) center / contain no-repeat;
+  mask: url(https://marca.odisse.com.br/selos/mao.svg) center / contain no-repeat; }
+.gate__logotipo { width: 117px; height: 25px; background: currentColor;
+  -webkit-mask: url(https://marca.odisse.com.br/logos/logotipo-odisse.svg) center / contain no-repeat;
+  mask: url(https://marca.odisse.com.br/logos/logotipo-odisse.svg) center / contain no-repeat; }
+.gate__rotulo { margin: -2px 0 12px; text-align: center; font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2); }
+.gate__field { display: block; }
+.gate__field span { display: block; font-size: 12.5px; font-weight: 550; margin-bottom: 4px; }
+.gate__field input {
+  width: 100%; padding: 8px 10px; font: inherit; font-size: 13px; color: inherit;
+  border: 1px solid var(--linha-forte); border-radius: var(--raio-p); background: var(--elevada);
+}
+.gate__field input:focus { outline: 2px solid var(--foco); outline-offset: -1px; border-color: transparent; }
+.gate__field input::placeholder { color: var(--tinta-3); }
+.gate .u-botao { width: 100%; margin-top: 4px; }
+.gate__error { margin: 0; padding: 10px 14px; border-radius: var(--raio-p); font-size: 13px; background: var(--perigo-fundo); color: var(--perigo); }
+.gate__note { margin: 8px 0 0; padding-top: 14px; border-top: 1px solid var(--linha); color: var(--tinta-2); font-size: 12px; line-height: 1.5; text-align: center; }
+
+/* ==========================================================================
+
+/* edição do concurso (lápis): nome e datas */
+.edicao { width: min(460px, calc(100vw - 32px)); }
+.edicao__corpo { display: flex; flex-direction: column; gap: 14px; }
+.edicao__corpo .u-campo input { width: 100%; }
+.edicao__datas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.edicao__nota { margin: 0; font-size: 12px; }
+.edicao__erro { margin: 0; padding: 8px 12px; border-radius: var(--raio-p); font-size: 13px; background: var(--perigo-fundo); color: var(--perigo); }
+.topo__sair { font-size: 12.5px; color: var(--tinta-2); text-decoration: none; }
+.topo__sair:hover { color: var(--tinta); text-decoration: underline; text-underline-offset: 3px; }
+
+/* enviar ao Projetos */
+.envio { width: min(560px, calc(100vw - 32px)); }
+.envio__corpo { display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+.envio__dados { display: grid; grid-template-columns: 110px 1fr; gap: 6px 12px; margin: 0; }
+.envio__dados dt { color: var(--tinta-2); font-weight: 600; }
+.envio__dados dd { margin: 0; }
+.envio__titulo { margin: 4px 0 0; font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--tinta-2); }
+.envio__etapas { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.envio__etapas li span:first-child { margin-right: 8px; }
+.envio__avisos, .envio__bloqueios { margin: 0; padding: 10px 14px 10px 28px; border-radius: var(--raio-p); display: flex; flex-direction: column; gap: 4px; }
+.envio__avisos { background: var(--veu); color: var(--tinta); }
+.envio__bloqueios { background: var(--perigo-fundo); color: var(--perigo); }

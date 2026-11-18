@@ -9,13 +9,17 @@
 <link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
 <link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
 <link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=6ebf93593a">
+<link rel="stylesheet" href="css/styles.css?v=05f507c5c1">
+  <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
+  <script type="speculationrules">
+  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
+  </script>
 </head>
 <body class="u-pagina">
 
   <header class="topo" data-pagina="concursos"></header>
 
-  <main class="pagina pagina--estreita">
+  <main class="pagina">
     <div class="pagina__barra">
       <h1>Concursos</h1>
       <nav class="subnav" id="subnav" aria-label="Páginas de Concursos"></nav>
@@ -40,9 +44,9 @@
     <p class="vazio" id="vazio" hidden>Nenhum concurso em acompanhamento. No monitoramento geral, use “Acompanhar” no cartão ou a coluna Situação na lista.</p>
   </main>
 
-  <script src="js/comum.js?v=5ef1900a76"></script>
+  <script src="js/comum.js?v=730c41a67c"></script>
   <script src="js/extrair-site.js?v=ff2f426d82"></script>
   <script src="js/site-oficial.js?v=dff3b3dec1"></script>
-  <script src="js/acompanhamento.js?v=b7d6dfeb39"></script>
+  <script src="js/acompanhamento.js?v=05d9130285"></script>
 </body>
 </html>

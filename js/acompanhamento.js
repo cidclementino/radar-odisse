@@ -180,7 +180,12 @@ function receber(dados) {
   atualizarContadores();
   if (!lendoPendentes) {
     lendoPendentes = true;
-    lerPendentes().finally(() => { lendoPendentes = false; });
+    // Se a página estiver sendo pré-carregada (ver regras de pré-carregamento no HTML), a leitura
+    // dos sites oficiais espera a pessoa de fato abrir a página.
+    const quandoVisivel = document.prerendering
+      ? new Promise(r => document.addEventListener('prerenderingchange', r, { once: true }))
+      : Promise.resolve();
+    quandoVisivel.then(lerPendentes).finally(() => { lendoPendentes = false; });
   }
 }
 

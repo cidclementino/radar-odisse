@@ -282,6 +282,7 @@ async function mudarSituacao(c, novo) {
   if (ACOMPANHADO.has(novo) && !atualizado.acompanhamento?.lido_em) {
     notificar(`Lendo o site oficial de “${nomeExibido(atualizado)}”…`, { ms: 0 });
     try {
+      await garantirLeitorSite();
       const lido = await lerSiteOficial(atualizado);
       if (lido) {
         substituir(lido);

@@ -63,7 +63,8 @@ async function listAll(kv, prefix) {
   let cursor;
   do {
     const page = await kv.list({ cursor, prefix });
-    const chaves = prefix ? page.keys : page.keys.filter(k => !k.name.startsWith(PREFIXO_IGNORADO));
+    // sem prefixo, ficam de fora as chaves internas (começam com "_": lápides e a cópia da lista)
+    const chaves = prefix ? page.keys : page.keys.filter(k => !k.name.startsWith('_'));
     const valores = await Promise.all(chaves.map(key => kv.get(key.name, 'json')));
     out.push(...valores.filter(Boolean));
     cursor = page.cursor;
@@ -498,20 +499,118 @@ async function handleCollectTerrenos(request, env) {
   });
 }
 
+// ---------------------------------------------------------------- cópia da lista
+//
+// Ler a lista chave por chave custa uma leitura de KV por item (~220 concursos → ~1 s e 220 leituras
+// da cota diária a cada página aberta). Cada namespace guarda então uma cópia da lista inteira na
+// chave `_lista` ({ em, itens: { chave: valor } }), e as rotas GET leem só ela.
+//
+// A cópia é mantida assim:
+//   - toda gravação (put/delete) feita por uma rota passa por rastrear(); ao fim da rota, as
+//     mudanças são aplicadas na cópia (ler, mudar, gravar). Lápides e chaves internas não contam;
+//   - se a cópia faltar, é montada na hora a partir das chaves; se tiver mais de COPIA_VALIDADE_MS,
+//     é servida assim mesmo e remontada em segundo plano (corrige qualquer divergência);
+//   - `?fresco=1` (botão "Recarregar") remonta antes de responder.
+// O KV aceita 1 gravação por segundo na mesma chave: se a gravação da cópia for recusada,
+// tenta de novo depois de 1 s.
+
+const LISTAS = ['CONCURSOS', 'REVISAO', 'OPORTUNIDADES', 'CORRETORES'];
+const CHAVE_COPIA = '_lista';
+const COPIA_VALIDADE_MS = 60 * 60 * 1000;
+
+async function montarCopia(kv) {
+  const itens = {};
+  let cursor;
+  do {
+    const page = await kv.list({ cursor });
+    const chaves = page.keys.filter(k => !k.name.startsWith('_'));
+    const valores = await Promise.all(chaves.map(k => kv.get(k.name, 'json')));
+    chaves.forEach((k, i) => { if (valores[i]) itens[k.name] = valores[i]; });
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return { em: Date.now(), itens };
+}
+
+async function gravarCopia(kv, copia) {
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    try { await kv.put(CHAVE_COPIA, JSON.stringify(copia)); return; } catch (err) {
+      if (tentativa === 2) { console.error('não deu para gravar a cópia da lista:', err.message); return; }
+      await new Promise(r => setTimeout(r, 1100));
+    }
+  }
+}
+
+async function listarRapido(kv, ctx, fresco) {
+  let copia = fresco ? null : await kv.get(CHAVE_COPIA, 'json');
+  if (!copia || !copia.itens) {
+    copia = await montarCopia(kv);
+    ctx.waitUntil(gravarCopia(kv, copia));
+  } else if (Date.now() - (copia.em || 0) > COPIA_VALIDADE_MS) {
+    ctx.waitUntil(montarCopia(kv).then(nova => gravarCopia(kv, nova)));
+  }
+  return Object.values(copia.itens);
+}
+
+/** Envolve os namespaces para anotar o que cada rota grava ou apaga. */
+function rastrear(env) {
+  const mudancas = {};
+  const envRastreado = { ...env };
+  for (const nome of LISTAS) {
+    const kv = env[nome];
+    if (!kv) continue;
+    const anotar = (chave, valor) => {
+      if (String(chave).startsWith('_')) return;
+      (mudancas[nome] ||= new Map()).set(chave, valor);
+    };
+    envRastreado[nome] = {
+      get: (...a) => kv.get(...a),
+      list: (...a) => kv.list(...a),
+      put: async (chave, valor, ...a) => { await kv.put(chave, valor, ...a); anotar(chave, valor); },
+      delete: async chave => { await kv.delete(chave); anotar(chave, null); },
+    };
+  }
+  return { envRastreado, mudancas };
+}
+
+async function aplicarNaCopia(env, nome, mudancas) {
+  const kv = env[nome];
+  let copia = await kv.get(CHAVE_COPIA, 'json');
+  if (!copia || !copia.itens) copia = await montarCopia(kv); // já inclui as mudanças recém-gravadas
+  else {
+    for (const [chave, valor] of mudancas) {
+      if (valor === null) delete copia.itens[chave];
+      else { try { copia.itens[chave] = JSON.parse(valor); } catch { /* valor não-JSON: não entra na lista */ } }
+    }
+  }
+  await gravarCopia(kv, copia);
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
+    const { envRastreado, mudancas } = rastrear(env);
+    const resposta = await rotear(request, envRastreado, ctx);
+    const nomes = Object.keys(mudancas);
+    // Espera a cópia ficar em dia antes de responder: assim a página que recarregar logo depois
+    // já recebe a lista com a mudança.
+    if (nomes.length) await Promise.all(nomes.map(n => aplicarNaCopia(env, n, mudancas[n])));
+    return resposta;
+  },
+};
+
+async function rotear(request, env, ctx) {
     const url = new URL(request.url);
+    const fresco = url.searchParams.get('fresco') === '1';
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS });
     }
 
     if (request.method === 'GET' && url.pathname === '/api/concursos') {
-      return json(await listAll(env.CONCURSOS));
+      return json(await listarRapido(env.CONCURSOS, ctx, fresco));
     }
 
     if (request.method === 'GET' && url.pathname === '/api/revisao') {
-      return json(await listAll(env.REVISAO));
+      return json(await listarRapido(env.REVISAO, ctx, fresco));
     }
 
     if (request.method === 'POST' && url.pathname === '/api/concursos/fundir') {
@@ -553,11 +652,11 @@ export default {
     }
 
     if (request.method === 'GET' && url.pathname === '/api/oportunidades') {
-      return json(await listAll(env.OPORTUNIDADES));
+      return json(await listarRapido(env.OPORTUNIDADES, ctx, fresco));
     }
 
     if (request.method === 'GET' && url.pathname === '/api/corretores') {
-      return json(await listAll(env.CORRETORES));
+      return json(await listarRapido(env.CORRETORES, ctx, fresco));
     }
 
     if (request.method === 'POST' && url.pathname === '/api/collect-terrenos') {
@@ -565,5 +664,4 @@ export default {
     }
 
     return json({ error: 'não encontrado' }, 404);
-  },
-};
+}

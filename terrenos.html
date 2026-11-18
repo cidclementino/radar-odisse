@@ -9,7 +9,11 @@
 <link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
 <link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
 <link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=6ebf93593a">
+<link rel="stylesheet" href="css/styles.css?v=05f507c5c1">
+  <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
+  <script type="speculationrules">
+  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
+  </script>
 </head>
 <body class="u-pagina">
 
@@ -97,7 +101,7 @@
     </section>
   </main>
 
-  <script src="js/comum.js?v=5ef1900a76"></script>
+  <script src="js/comum.js?v=730c41a67c"></script>
   <script src="js/terrenos.js?v=92acc4fcc1"></script>
 </body>
 </html>

@@ -72,7 +72,8 @@ async function carregarComCache(chave, url, aoReceber, { forcar = false } = {}) 
   if (guardado && !forcar && Date.now() - guardado.em < CACHE_FRESCO_MS) return;
 
   try {
-    const res = await fetch(url, { cache: 'no-store' });
+    // "Recarregar" (forcar) pede ao Worker a lista remontada, sem a cópia guardada lá (ver worker/index.js)
+    const res = await fetch(forcar ? `${url}${url.includes('?') ? '&' : '?'}fresco=1` : url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Worker respondeu ${res.status}`);
     const dados = await res.json();
     cacheGravar(chave, dados);
@@ -88,6 +89,25 @@ async function carregarComCache(chave, url, aoReceber, { forcar = false } = {}) 
 function cacheIdade(chave) {
   const c = cacheLer(chave);
   return c ? c.em : null;
+}
+
+// ---------------------------------------------------------------- scripts sob demanda
+//
+// O leitor do site oficial (extrair-site.js + site-oficial.js) só é usado ao clicar em "Acompanhar".
+// Na página de Monitoramento geral ele é baixado nessa hora, e não a cada abertura da página.
+
+const LEITOR_SITE = ['js/extrair-site.js?v=ff2f426d82', 'js/site-oficial.js?v=dff3b3dec1']; // versões: scripts/versionar.py
+let leitorSite = null;
+function garantirLeitorSite() {
+  if (typeof lerSiteOficial === 'function') return Promise.resolve();
+  const carregar = src => new Promise((ok, falha) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = ok; s.onerror = () => falha(new Error(`não carregou ${src}`));
+    document.head.appendChild(s);
+  });
+  leitorSite ||= carregar(LEITOR_SITE[0]).then(() => carregar(LEITOR_SITE[1]))
+    .catch(err => { leitorSite = null; throw err; });
+  return leitorSite;
 }
 
 // ---------------------------------------------------------------- preferências

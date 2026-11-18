@@ -1,0 +1,25 @@
+name: Sondar fontes candidatas
+
+# Só manual. Verifica sites candidatos a fonte (feed, API do WordPress, publicações sobre concurso)
+# e imprime um relatório no log. Não grava nada.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sites:
+        description: 'Domínios separados por espaço (vazio = lista padrão do script)'
+        required: false
+        default: ''
+
+jobs:
+  sondar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Sondar
+        env:
+          SITES: ${{ inputs.sites }}
+        run: node scripts/sondar-fontes.js

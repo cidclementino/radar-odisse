@@ -93,6 +93,13 @@ function atualizarOpcoesOp() {
   document.getElementById('f-fonte').value = fontes.includes(filtrosOp.fonte) ? filtrosOp.fonte : '';
 }
 
+/** Miniatura do vídeo (YouTube): a que a coleta guardou ou, nos itens antigos, a do próprio id do vídeo. */
+function miniaturaDe(op) {
+  if (op.imagem_url) return op.imagem_url;
+  const id = (op.link_original || '').match(/(?:[?&]v=|youtu\.be\/)([\w-]{11})/)?.[1];
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+}
+
 function renderOportunidadeCard(op) {
   const el = document.createElement('article');
   el.className = `oportunidade oportunidade--nivel-${op.nivel_maturidade}${STATUS_OCULTOS.has(op.status_interno) ? ' is-apagado' : ''}`;
@@ -100,7 +107,9 @@ function renderOportunidadeCard(op) {
   const corretor = op.corretor_vinculado_id ? corretoresPorId[op.corretor_vinculado_id] : null;
   const quando = op.publicado_em ? `Publicado ${formatarData(op.publicado_em)}` : `Coletado ${formatarData(op.coletado_em)}`;
 
+  const thumb = miniaturaDe(op);
   el.innerHTML = `
+    ${thumb ? `<a href="${escapeHTML(op.link_original)}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img class="oportunidade__thumb" src="${escapeHTML(thumb)}" alt="" loading="lazy" decoding="async"></a>` : ''}
     <div class="oportunidade__tags">
       <span class="u-etiqueta suave">${escapeHTML(PERSONA_LABELS[op.persona] || op.persona)}</span>
       ${etiquetaNivel(op.nivel_maturidade)}
@@ -111,6 +120,7 @@ function renderOportunidadeCard(op) {
       <span>${escapeHTML(fonteNome(op.fonte))} · ${quando}</span>
       <span class="js-corretor">${corretor ? escapeHTML(corretor.nome) : ''}</span>
     </div>`;
+  el.querySelector('img.oportunidade__thumb')?.addEventListener('error', e => e.target.removeAttribute('src'), { once: true });
   return el;
 }
 

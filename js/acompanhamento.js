@@ -67,11 +67,15 @@ function renderDatas(c, site) {
     </li>`).join('')}</ol></section>`;
 }
 
+// cartões abertos nesta visita (por padrão todos começam fechados, só com o topo)
+const abertos = new Set();
+
 function renderCartao(c) {
   const a = c.acompanhamento || {};
   const site = a.site;
   const el = document.createElement('article');
-  el.className = `acomp${diasAte(c.datas?.inscricao_fim) < 0 ? ' is-apagado' : ''}`;
+  const temCorpo = !!(site || c.datas?.inscricao_fim);
+  el.className = `acomp${diasAte(c.datas?.inscricao_fim) < 0 ? ' is-apagado' : ''}${abertos.has(c.id) ? ' is-aberto' : ''}`;
   const imagem = c.imagem_url || site?.imagem;
   const link = c.link_oficial || c.fonte_url_original;
 
@@ -82,6 +86,7 @@ function renderCartao(c) {
   else estadoLeitura = '<span class="u-apoio">Site ainda não lido</span>';
 
   el.innerHTML = `
+    ${temCorpo ? `<button type="button" class="acomp__alternar js-alternar" aria-expanded="${abertos.has(c.id)}" aria-label="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}" title="${abertos.has(c.id) ? 'Recolher' : 'Ver o que o site oficial diz'}"></button>` : ''}
     <div class="acomp__topo">
       ${imagem ? `<img class="acomp__banner" src="${escapeHTML(imagem)}" alt="" loading="lazy" decoding="async">` : '<div class="acomp__banner"></div>'}
       <div class="acomp__cabeca">
@@ -99,7 +104,7 @@ function renderCartao(c) {
         <div class="acomp__leitura">${estadoLeitura}</div>
       </div>
     </div>
-    ${site || c.datas?.inscricao_fim ? `<div class="acomp__corpo">
+    ${temCorpo ? `<div class="acomp__corpo">
       ${site?.descricao ? `<p class="acomp__descricao">${escapeHTML(site.descricao)}</p>` : ''}
       <div class="acomp__grade">
         ${renderDatas(c, site)}
@@ -131,6 +136,15 @@ function renderCartao(c) {
     }
   });
   el.querySelector('.js-reler').addEventListener('click', () => ler(c, true));
+  el.querySelector('.js-alternar')?.addEventListener('click', e => {
+    const aberto = !abertos.has(c.id);
+    if (aberto) abertos.add(c.id); else abertos.delete(c.id);
+    el.classList.toggle('is-aberto', aberto);
+    const rotulo = aberto ? 'Recolher' : 'Ver o que o site oficial diz';
+    e.currentTarget.setAttribute('aria-expanded', String(aberto));
+    e.currentTarget.setAttribute('aria-label', rotulo);
+    e.currentTarget.title = rotulo;
+  });
   return el;
 }
 

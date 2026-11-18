@@ -179,6 +179,7 @@ async function parse() {
             nivel_maturidade: nivel,
             corretor_vinculado_id: null, // resolvido pelo worker na fusão
             link_original: link,
+            imagem_url: (() => { const t = item.snippet.thumbnails || {}; return (t.high || t.medium || t.default)?.url || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`; })(),
             texto_bruto: item.snippet.description.slice(0, 500),
             publicado_em: item.snippet.publishedAt?.slice(0, 10) || null,
             coletado_em: new Date().toISOString(),

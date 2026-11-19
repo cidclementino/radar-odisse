@@ -14,7 +14,9 @@ on:
 jobs:
   coletar:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # A leitura é do Brasil inteiro (~10 mil contratos por dia, ~4 min por dia lido) e a primeira
+    # carga também busca os documentos de tudo: 30 dias levam umas 2 h. Limite do Actions: 6 h.
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
 

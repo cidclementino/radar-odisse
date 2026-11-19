@@ -9,7 +9,7 @@
 <link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
 <link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
 <link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=df1269af42">
+<link rel="stylesheet" href="css/styles.css?v=e88e98ea46">
 <script src="js/auth.js?v=72f6ee79ac"></script>
 <script>exigirAutenticacao();</script>
   <script type="speculationrules">
@@ -23,6 +23,10 @@
   <main class="pagina">
     <div class="pagina__barra">
       <h1>Licitações</h1>
+      <nav class="subnav" id="fase" aria-label="Fase">
+        <button type="button" data-fase="abertas">Abertas<span class="contador" id="contador-abertas" hidden></span></button>
+        <button type="button" data-fase="contratadas">Contratadas<span class="contador" id="contador-contratadas" hidden></span></button>
+      </nav>
       <div class="vista" id="vista" role="group" aria-label="Visualização">
         <button type="button" data-vista="cartoes">Cartões</button>
         <button type="button" data-vista="lista">Lista</button>
@@ -32,7 +36,8 @@
         <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
       </div>
     </div>
-    <p class="pagina__intro">Contratações públicas de projeto (arquitetura, urbanismo, paisagismo, interiores, restauro) com propostas abertas na Paraíba, em Pernambuco e no Rio Grande do Norte, lidas do PNCP em dias úteis. A borda mostra quanto falta para o fim das propostas. "Projeto e obra" marca a contratação integrada, em que o projeto vem junto com a execução.</p>
+    <p class="pagina__intro" id="intro-contratadas" hidden>Contratos de obra assinados nos últimos dias na Paraíba, em Pernambuco e no Rio Grande do Norte (escolas, creches, unidades de saúde, praças, habitação, restauro…), a partir de R$ 300 mil. A pista é a construtora vencedora, que vai precisar de arquitetura: nível 3 quando ela tem de entregar o projeto (contratação integrada), 2 para obra nova ou acima de R$ 1,5 milhão, 1 para reforma menor. Telefone e e-mail vêm do cadastro público do CNPJ na Receita.</p>
+    <p class="pagina__intro" id="intro-abertas">Contratações públicas de projeto (arquitetura, urbanismo, paisagismo, interiores, restauro) com propostas abertas na Paraíba, em Pernambuco e no Rio Grande do Norte, lidas do PNCP em dias úteis. A borda mostra quanto falta para o fim das propostas. "Projeto e obra" marca a contratação integrada, em que o projeto vem junto com a execução.</p>
 
     <div class="filtros" id="filtros">
       <input type="search" id="f-busca" placeholder="Buscar no objeto, órgão ou município" aria-label="Buscar">
@@ -47,6 +52,13 @@
         <option value="15">Em até 15 dias</option>
         <option value="45">Em 16 a 45 dias</option>
         <option value="mais">Em mais de 45 dias</option>
+      </select>
+      <select id="f-nivel" aria-label="Nível" hidden>
+        <option value="">Todos os níveis</option>
+        <option value="3">Nível 3 · Vencedora entrega projeto</option>
+        <option value="2">Nível 2 · Obra nova ou grande</option>
+        <option value="2+">Nível 2 ou 3</option>
+        <option value="1">Nível 1 · Reforma</option>
       </select>
       <select id="f-tipo" aria-label="Tipo de contratação">
         <option value="">Projeto ou projeto e obra</option>
@@ -68,6 +80,6 @@
   </main>
 
   <script src="js/comum.js?v=20742bad54"></script>
-  <script src="js/licitacoes.js?v=e3d5b59b1d"></script>
+  <script src="js/licitacoes.js?v=af6e88809f"></script>
 </body>
 </html>

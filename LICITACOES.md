@@ -76,8 +76,42 @@ Cartão do concurso sem banner: borda e número pelo prazo de propostas (≤ 15 
 frase comum), órgão, local, modalidade e valor. O clique abre o detalhe, com observações e os links
 do edital no PNCP e do sistema de propostas. A situação muda no próprio cartão.
 
+## Contratadas: a construtora vencedora como pista (nov/2026)
+
+Além das abertas, o Radar lê os **contratos de obra assinados** no mesmo recorte (PB, PE, RN). Quem
+venceu a obra muitas vezes não tem arquitetura em casa e vai precisar dela: projeto executivo na
+contratação integrada, detalhamento, compatibilização, aprovação, as built. A pista é a construtora,
+e o Odisse se oferece como equipe de projeto dela.
+
+- **Fonte:** `GET /v1/contratos` do PNCP (contratos publicados num intervalo). A API não filtra por
+  UF nem por categoria, então a coleta lê o país inteiro e filtra aqui: ~4.500 contratos por dia
+  (10 páginas de 500). Sondagem de 18/11/2026: 3 dias, 22.992 contratos lidos, 16 obras de interesse,
+  todas com telefone da vencedora.
+- **Janela:** 3 dias por coleta (cobre o fim de semana e uma falha). No disparo manual, o campo
+  "dias" pede até 120 — para trazer o passado recente na primeira vez.
+- **O que entra** (`parsers/lib/contratos.js`): contrato (não aditivo nem apostilamento) de pessoa
+  jurídica, despesa, em PB/PE/RN, a partir de **R$ 300 mil**, categoria Obras (ou Serviços de
+  Engenharia com verbo de obra), sobre edificação ou espaço público (escola, creche, UBS, sede,
+  praça, mercado, habitação, restauro…). Fica fora: pavimentação, saneamento e afins, manutenção
+  predial contínua, compra, e contrato **só de projeto** (quem venceu é um escritório: concorrente,
+  não cliente).
+- **Nível** (a escala do Radar, como em Terrenos):
+  - 3 — contratação integrada ou semi-integrada: a vencedora tem de entregar o projeto;
+  - 2 — obra nova (construção, implantação) ou acima de R$ 1,5 milhão;
+  - 1 — reforma menor.
+- **Contato da vencedora:** telefones e e-mail do cadastro público do CNPJ (BrasilAPI, base da
+  Receita Federal), buscados uma vez por CNPJ em cada coleta. Celular vira link de WhatsApp. Não é
+  o vetor "CNPJ/SPE" descartado em Terrenos (aquele buscava empresas novas; este só completa o
+  contato de quem já venceu um contrato público).
+- **Situações:** monitorando, contatada, parceria, descartada.
+- **Ligação com a aberta:** o contrato traz o número da contratação de origem; se ela estava no Radar
+  como aberta, passa a mostrar "Contratada" e quem venceu.
+- Mesmo KV (`LICITACOES`), com `fase: 'contratada'` e id `pncpc-…`. Interface: aba "Contratadas" na
+  página, com cartão no desenho de Terrenos (borda pelo nível) e a vencedora em destaque.
+
 ## Próximos passos possíveis
 
-- "Enviar ao funil" (oportunidade no vendas, `origem = radar`), como em Terrenos.
+- "Enviar ao funil" (oportunidade no vendas, `origem = radar`), como em Terrenos. Nas contratadas,
+  a construtora vencedora é a titular (organização), e o contato dela vai para os Contatos.
 - Ligar a licitação a um projeto no projetos.odisse quando o Odisse participar, como em Concursos.
 - Ampliar a geografia (AL, CE) se o volume em PB/PE/RN for baixo.

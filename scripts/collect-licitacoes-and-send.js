@@ -2,7 +2,10 @@
 // (.github/workflows/collect-licitacoes.yml); roda também localmente:
 //   WORKER_URL=… COLLECT_SECRET=… node scripts/collect-licitacoes-and-send.js
 
+// Duas leituras do PNCP: licitações de projeto com propostas abertas e contratos de obra assinados
+// (a construtora vencedora como pista). Uma falhar não impede a outra.
 const pncp = require('../parsers/pncp');
+const contratos = require('../parsers/pncp-contratos');
 
 async function main() {
   const { WORKER_URL, COLLECT_SECRET } = process.env;
@@ -11,9 +14,18 @@ async function main() {
     process.exit(1);
   }
 
-  const licitacoes = await pncp.parse();
+  const licitacoes = [];
+  for (const [nome, parser] of [['abertas', pncp], ['contratadas', contratos]]) {
+    try {
+      const itens = await parser.parse();
+      console.log(`${nome}: ${itens.length}`);
+      licitacoes.push(...itens);
+    } catch (err) {
+      console.error(`${nome} falhou:`, err.message);
+    }
+  }
   if (!licitacoes.length) {
-    console.log('Nenhuma licitação de projeto nesta rodada — nada a enviar.');
+    console.log('Nada nesta rodada — nada a enviar.');
     return;
   }
 

@@ -64,3 +64,45 @@ test('Registro do PNCP vira Licitação; valor zero vira nulo', () => {
   assert.equal(l.publicado_em, '2026-11-10');
   assert.equal(paraLicitacao({ numeroControlePNCP: 'x', objetoCompra: 'Aquisição de pneus', modalidadeId: 6 }), null);
 });
+
+// ---------------------------------------------------------------- contratadas
+const { classificarContrato, paraContratada, contatoDaReceita } = require('../parsers/lib/contratos');
+const contrato = (objeto, extra = {}) => ({
+  numeroControlePNCP: '08778326000156-2-000025/2026', numeroControlePncpCompra: '08778326000156-1-000095/2026',
+  anoContrato: 2026, sequencialContrato: 25, receita: false, tipoPessoa: 'PJ',
+  tipoContrato: { id: 1, nome: 'Contrato (termo inicial)' }, categoriaProcesso: { id: 7, nome: 'Obras' },
+  objetoContrato: objeto, valorGlobal: 2500000, niFornecedor: '12345678000190', nomeRazaoSocialFornecedor: 'CONSTRUTORA EXEMPLO LTDA',
+  orgaoEntidade: { cnpj: '08778326000156', razaoSocial: 'MUNICIPIO DE JOAO PESSOA', esferaId: 'M' },
+  unidadeOrgao: { municipioNome: 'João Pessoa', ufSigla: 'PB', nomeUnidade: 'SEINFRA' },
+  dataAssinatura: '2026-11-12', dataVigenciaFim: '2027-11-12', dataPublicacaoPncp: '2026-11-17T10:00:00', ...extra,
+});
+
+test('Contratadas: níveis pela obra', () => {
+  assert.equal(classificarContrato(contrato('Contratação integrada para elaboração dos projetos básico e executivo e execução das obras de implantação da creche')).nivel, 3);
+  assert.equal(classificarContrato(contrato('Construção da Escola Municipal do bairro Gramame')).nivel, 2);
+  assert.equal(classificarContrato(contrato('Reforma da Unidade Básica de Saúde do Cristo', { valorGlobal: 600000 })).nivel, 1);
+  assert.equal(classificarContrato(contrato('Reforma e ampliação do Mercado Público', { valorGlobal: 1800000 })).nivel, 2);
+});
+
+test('Contratadas: o que fica fora', () => {
+  assert.equal(classificarContrato(contrato('Pavimentação e drenagem de vias do bairro X')), null, 'infra');
+  assert.equal(classificarContrato(contrato('Construção da creche', { valorGlobal: 120000 })), null, 'pequena');
+  assert.equal(classificarContrato(contrato('Construção da creche', { unidadeOrgao: { ufSigla: 'SP' } })), null, 'fora da região');
+  assert.equal(classificarContrato(contrato('Construção da creche', { tipoContrato: { id: 2, nome: 'Termo Aditivo' } })), null, 'aditivo');
+  assert.equal(classificarContrato(contrato('Elaboração de projeto arquitetônico da creche', { categoriaProcesso: { id: 9 } })), null, 'só projeto é concorrente');
+  assert.equal(classificarContrato(contrato('Manutenção predial preventiva e corretiva das escolas', { categoriaProcesso: { id: 9 } })), null, 'manutenção');
+  assert.equal(classificarContrato(contrato('Aquisição de carteiras escolares', { categoriaProcesso: { id: 2 } })), null, 'compra');
+});
+
+test('Contratada vira item com vencedora, link e licitação de origem', () => {
+  const c = paraContratada(contrato('Construção da Escola Municipal do bairro Gramame'), '2026-11-18T00:00:00Z');
+  assert.equal(c.id, 'pncpc-08778326000156-2-000025-2026');
+  assert.equal(c.licitacao_id, 'pncp-08778326000156-1-000095-2026');
+  assert.equal(c.fase, 'contratada');
+  assert.equal(c.valor_global, 250000000);
+  assert.deepEqual(c.vencedor, { cnpj: '12345678000190', nome: 'CONSTRUTORA EXEMPLO LTDA' });
+  assert.equal(c.link_pncp, 'https://pncp.gov.br/app/contratos/08778326000156/2026/25');
+  const ct = contatoDaReceita({ ddd_telefone_1: '8332221100', ddd_telefone_2: '', email: 'OBRAS@EXEMPLO.COM.BR', nome_fantasia: 'Exemplo', municipio: 'JOAO PESSOA', uf: 'PB' });
+  assert.deepEqual(ct.telefones, ['+558332221100']);
+  assert.equal(ct.email, 'obras@exemplo.com.br');
+});

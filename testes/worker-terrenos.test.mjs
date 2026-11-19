@@ -74,4 +74,10 @@ test('licitações: coleta mantém a decisão do painel e o resto vem do PNCP', 
   const l=await env.LICITACOES.get(lic.id,'json');
   eq(l.status_interno,'participando','situação mantida'); eq(l.observacoes,'visitar o terreno','obs mantida'); eq(l.coletado_em,'2026-11-18T00:00:00Z','primeira coleta'); eq(l.encerramento,'2026-12-10T09:00:00','prazo retificado vem do PNCP');
   [st,r]=await call('GET','/api/licitacoes'); eq(st,200,'lista'); eq(r.length,1,'um item');
+  // contratada: entra com outro id, liga a aberta e tem situações próprias
+  const ct={id:'pncpc-9-2-000003-2026',fase:'contratada',licitacao_id:lic.id,objeto:'Construção da creche',vencedor:{cnpj:'1',nome:'Construtora X'},status_interno:'monitorando'};
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[ct]},'s'); eq(r.novas,1,'contratada nova');
+  eq((await env.LICITACOES.get(lic.id,'json')).contrato_id,ct.id,'aberta aponta para o contrato');
+  [st]=await call('PATCH','/api/licitacoes/'+ct.id,{status_interno:'participando'}); eq(st,400,'situação de aberta não vale');
+  [st,r]=await call('PATCH','/api/licitacoes/'+ct.id,{status_interno:'contatado'}); eq(st,200,'contatado'); eq(r.status_interno,'contatado','ok');
 });

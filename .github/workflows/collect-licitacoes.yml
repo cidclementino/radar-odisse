@@ -4,12 +4,17 @@ on:
   schedule:
     # Segunda a sexta, 09:37 UTC (06:37 em Brasília), depois da coleta de Terrenos
     - cron: '37 9 * * 1-5'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: 'Contratos assinados: quantos dias para trás ler (padrão 3; até 120 na primeira vez)'
+        required: false
+        default: '3'
 
 jobs:
   coletar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -24,4 +29,5 @@ jobs:
         env:
           WORKER_URL: ${{ secrets.RADAR_WORKER_URL }}
           COLLECT_SECRET: ${{ secrets.RADAR_COLLECT_SECRET }}
+          CONTRATOS_DIAS: ${{ inputs.dias || '3' }}
         run: node scripts/collect-licitacoes-and-send.js

@@ -232,6 +232,21 @@ export async function patchOportunidade(request, env, id, json) {
   return json({ oportunidade: atualizado, corretores });
 }
 
+// Terreno apagado deixa uma lápide no mesmo KV (como os concursos): a coleta seguinte acharia o
+// anúncio ou o vídeo de novo na fonte e o recriaria como novo. Os ids da coleta são estáveis
+// (fonte + link + título), então a lápide guarda só o id e o registro, sem prazo para sumir.
+export const LAPIDE_TERRENO = '_ignorado:';
+
+/** DELETE /api/oportunidades/:id — tira o terreno do Radar de vez e o desliga do corretor. */
+export async function apagarOportunidade(env, id, json) {
+  const existente = await env.OPORTUNIDADES.get(id, 'json');
+  if (!existente) return json({ error: 'oportunidade não encontrada' }, 404);
+  await env.OPORTUNIDADES.put(LAPIDE_TERRENO + id, JSON.stringify({ ...existente, excluido_em: new Date().toISOString() }));
+  await env.OPORTUNIDADES.delete(id);
+  const corretor = await ajustarVinculo(env, existente.corretor_vinculado_id, id, false);
+  return json({ deletado: true, id, corretores: corretor ? [corretor] : [] });
+}
+
 export async function criarOportunidadeManual(request, env, json) {
   const { valores, erro } = validar(await lerCorpo(request), CAMPOS_OPORTUNIDADE);
   if (erro) return json({ error: erro }, 400);

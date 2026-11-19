@@ -21,6 +21,7 @@
 //   DELETE /api/concursos/:id      -> apaga um Concurso e deixa uma lápide (`_ignorado:<id>`) para a coleta não trazê-lo de volta
 //   GET    /api/oportunidades      -> lista todas as Oportunidades (Terrenos)
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
+//   DELETE /api/oportunidades/:id  -> apaga um terreno (captado por engano) e deixa lápide, como nos Concursos
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
 //   GET    /api/licitacoes         -> lista as Licitações (PNCP)
 //   GET    /api/licitacoes/:id     -> o registro inteiro de uma Licitação (com os trechos do termo de referência)
@@ -51,7 +52,7 @@
 import { classificarConcursos, fundir } from './dedup.js';
 import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
-import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
+import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual, apagarOportunidade, LAPIDE_TERRENO } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
 import { coletarLicitacoes, patchLicitacao, limparLicitacoes, lerLicitacao, arquivoPncp } from './licitacoes.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
@@ -513,7 +514,13 @@ async function handleCollectTerrenos(request, env) {
   }
 
   const payload = await request.json();
-  const { oportunidades = [], corretoresCandidatos = [] } = payload || {};
+  const { oportunidades: recebidas = [], corretoresCandidatos: todosCandidatos = [] } = payload || {};
+
+  // 0. Terrenos apagados no painel (lápide) não voltam, nem o corretor que veio só por causa deles.
+  const lapides = await Promise.all(recebidas.map(op => env.OPORTUNIDADES.get(LAPIDE_TERRENO + op.id)));
+  const apagadas = new Set(recebidas.filter((_, i) => lapides[i] !== null).map(op => op.id));
+  const oportunidades = recebidas.filter(op => !apagadas.has(op.id));
+  const corretoresCandidatos = todosCandidatos.filter(c => !apagadas.has(c.oportunidade_id));
 
   // 1. Processa candidatos a Corretor primeiro — oportunidades de persona
   // "corretor" (ex: YouTube) e o enriquecimento do ZAP dependem dos ids
@@ -556,6 +563,7 @@ async function handleCollectTerrenos(request, env) {
 
   return json({
     oportunidades_gravadas: oportunidades.length,
+    ignoradas_por_terem_sido_apagadas: apagadas.size,
     corretores_atualizados: corretoresAtualizados.size,
   });
 }
@@ -785,6 +793,9 @@ async function rotear(request, env, ctx) {
     const matchOportunidade = url.pathname.match(/^\/api\/oportunidades\/([^/]+)$/);
     if (request.method === 'PATCH' && matchOportunidade) {
       return patchOportunidade(request, env, decodeURIComponent(matchOportunidade[1]), json);
+    }
+    if (request.method === 'DELETE' && matchOportunidade) {
+      return apagarOportunidade(env, decodeURIComponent(matchOportunidade[1]), json);
     }
 
     if (request.method === 'POST' && url.pathname === '/api/collect-terrenos') {

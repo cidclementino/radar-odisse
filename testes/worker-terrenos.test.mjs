@@ -68,6 +68,23 @@ test('edição manual de corretores e terrenos convive com a coleta', async () =
   let [st8]=await call('PATCH','/api/oportunidades/op1',{categoria:'casa'}); eq(st8,400,'categoria inválida');
 });
 
+test('terreno apagado sai do corretor e não volta na coleta', async () => {
+  const call=async(m,path,body,tok='p')=>{const r=await w.fetch(new Request('https://x'+path,{method:m,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),env,ctx);return [r.status,await r.json()]};
+  const coleta={oportunidades:[{id:'opx',titulo:'Vídeo que não é terreno',local:'RM',status_interno:'monitorando',nivel_maturidade:1}],corretoresCandidatos:[{nome:'Canal X',empresa:'Canal X',fonte:'youtube.com',regiao:'RM',canal_id:'UCX',oportunidade_id:'opx',nivel:1}]};
+  await call('POST','/api/collect-terrenos',coleta,'s');
+  const achar=()=>[...env.CORRETORES.m.values()].map(v=>JSON.parse(v)).find(c=>c.canal_id==='UCX');
+  eq(achar().oportunidades_vinculadas,['opx'],'ligado pela coleta');
+  let [st,r]=await call('DELETE','/api/oportunidades/opx'); eq(st,200,'apaga'); eq(r.deletado,true,'deletado');
+  eq(r.corretores[0].oportunidades_vinculadas,[],'sai do corretor');
+  eq(await env.OPORTUNIDADES.get('opx'),null,'chave apagada');
+  eq((await env.OPORTUNIDADES.get('_ignorado:opx','json')).titulo,'Vídeo que não é terreno','lápide');
+  [st,r]=await call('GET','/api/oportunidades'); eq(r.some(o=>o.id==='opx'||o.id==='_ignorado:opx'),false,'fora da lista');
+  [st,r]=await call('POST','/api/collect-terrenos',coleta,'s'); eq(r.ignoradas_por_terem_sido_apagadas,1,'recoleta ignora');
+  eq(await env.OPORTUNIDADES.get('opx'),null,'não volta'); eq(achar().oportunidades_vinculadas,[],'não religa');
+  [st]=await call('DELETE','/api/oportunidades/opx'); eq(st,404,'já apagado');
+  [st]=await call('DELETE','/api/oportunidades/op2','','errada'); eq(st,401,'sem senha');
+});
+
 test('licitações: coleta mantém a decisão do painel e o resto vem do PNCP', async () => {
   const call=async(m,path,body,tok='p')=>{const r=await w.fetch(new Request('https://x'+path,{method:m,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),env,ctx);return [r.status,await r.json()]};
   const lic={id:'pncp-1-1-000001-2026',objeto:'Elaboração de projeto arquitetônico',encerramento:'2026-12-01T09:00:00',valor_estimado:100000,status_interno:'monitorando',coletado_em:'2026-11-18T00:00:00Z'};

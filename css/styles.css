@@ -413,6 +413,8 @@ a.linha__titulo:hover { color: var(--destaque-texto); text-decoration: underline
 .fusao__opcao--banner:has(input:checked) .fusao__banner { outline: 2px solid var(--ok); outline-offset: 1px; }
 .fusao__nota { margin: 14px 0 0; line-height: 1.5; }
 .fusao__rodape { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--linha); }
+/* ação destrutiva do diálogo (Excluir) fica à esquerda, longe do Salvar */
+.fusao__rodape .js-excluir { margin-right: auto; }
 @media (max-width: 640px) { .fusao__lados { grid-template-columns: 1fr 1fr; gap: 8px; } .fusao__tabela th { width: 96px; } }
 #lista-oportunidades .linha td:first-child, #lista-corretores .linha td:first-child { min-width: 260px; }
 

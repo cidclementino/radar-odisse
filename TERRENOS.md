@@ -230,6 +230,12 @@ criados à mão no painel (lápis em cada cartão e linha; botões "Novo terreno
 - **`campos_manuais`**: todo campo mexido à mão entra nessa lista e a coleta não mexe mais nele,
   nem quando foi esvaziado de propósito. Situação e observações nunca são tocadas pela coleta.
   Um terreno ligado à mão a um corretor não é religado pela coleta.
+- **Excluir** (Cid, 19/11/2026; mesma dinâmica dos Concursos): para o que foi captado por engano
+  (vídeo ou anúncio que não é terreno). Botão "Excluir" no diálogo do lápis, com confirmação.
+  `DELETE /api/oportunidades/:id` grava a lápide `_ignorado:<id>` no mesmo KV, apaga o registro e
+  tira o terreno da lista do corretor. A coleta descarta o que tiver lápide (os ids são estáveis:
+  fonte + link + título) e também o candidato a corretor que veio só por aquele terreno.
+  Diferente de "Descartado": descartar esconde e guarda; excluir apaga de vez.
 - Testes: `testes/worker-terrenos.test.mjs` (rotas + recoleta, Worker empacotado com esbuild).
 
 Próximo passo: ver `universo-radar-funil` no projeto Universo ("Levar aos Contatos",

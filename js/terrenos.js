@@ -468,7 +468,7 @@ function linkOuTexto(href, texto, classe = '') {
  * Diálogo de formulário. `campos`: { nome, rotulo, tipo ('texto'|'area'|'select'|'tel'|'email'|'url'),
  * valor, opcoes ([[valor, rótulo]]), dica, obrigatorio, largo }. Envia só o que mudou (ou tudo, ao criar).
  */
-function abrirFormulario({ titulo, nota, campos, criando, enviar }) {
+function abrirFormulario({ titulo, nota, campos, criando, enviar, excluir }) {
   let dialogo = document.getElementById('edicao-terrenos');
   if (!dialogo) {
     dialogo = document.createElement('dialog');
@@ -499,12 +499,19 @@ function abrirFormulario({ titulo, nota, campos, criando, enviar }) {
         <p class="edicao__erro" role="alert" hidden></p>
       </div>
       <footer class="fusao__rodape">
+        ${excluir ? '<button type="button" class="u-botao perigo js-excluir">Excluir</button>' : ''}
         <button type="button" class="u-botao js-cancelar">Cancelar</button>
         <button type="submit" class="u-botao forte">${criando ? 'Criar' : 'Salvar'}</button>
       </footer>
     </form>`;
   dialogo.querySelectorAll('.js-cancelar').forEach(b => b.addEventListener('click', () => dialogo.close()));
   const form = dialogo.querySelector('form');
+  dialogo.querySelector('.js-excluir')?.addEventListener('click', async e => {
+    const botao = e.currentTarget;
+    botao.disabled = true;
+    if (await excluir()) dialogo.close();
+    else botao.disabled = false;
+  });
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const erro = form.querySelector('.edicao__erro');
@@ -536,7 +543,7 @@ function abrirFormulario({ titulo, nota, campos, criando, enviar }) {
 
 async function chamarWorker(metodo, caminho, corpo) {
   const res = await fetch(`${WORKER}${caminho}`, {
-    method: metodo, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo),
+    method: metodo, headers: { 'Content-Type': 'application/json' }, body: corpo === undefined ? undefined : JSON.stringify(corpo),
   });
   const r = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(r.error || `Worker respondeu ${res.status}`);
@@ -549,6 +556,30 @@ function guardarCorretor(c) {
   if (i >= 0) corretores[i] = c; else corretores.push(c);
   corretoresPorId[c.id] = c;
   if (corretoresProntos) cacheGravar('corretores', corretores);
+}
+
+function tirarOportunidade(id) {
+  oportunidades = oportunidades.filter(x => x.id !== id);
+  cacheGravar('oportunidades', oportunidades);
+}
+
+/** Apaga um terreno captado por engano: sai do Radar e a coleta não o traz de volta (como nos Concursos). */
+async function excluirOportunidade(op) {
+  if (!confirm(`Apagar definitivamente "${op.titulo}"? Ele sai do Radar e não volta nas próximas coletas. Essa ação não pode ser desfeita.`)) return false;
+  try {
+    const r = await chamarWorker('DELETE', `/api/oportunidades/${encodeURIComponent(op.id)}`);
+    tirarOportunidade(op.id);
+    for (const c of r.corretores || []) guardarCorretor(c);
+    atualizarOpcoesOp();
+    renderOportunidades();
+    renderCorretores();
+    notificar('Terreno apagado.');
+    return true;
+  } catch (err) {
+    console.error(err);
+    alert('Não foi possível apagar esse terreno agora. Tente de novo em instantes.');
+    return false;
+  }
 }
 
 function guardarOportunidade(op) {
@@ -623,6 +654,7 @@ async function editarOportunidade(op) {
         opcoes: [['monitorando', 'Monitorando'], ['descartado', 'Descartado'], ...(op.status_interno === 'no_funil' ? [['no_funil', 'No funil']] : [])] }]),
       { nome: 'observacoes', rotulo: 'Observações', tipo: 'area', valor: op.observacoes, largo: true },
     ],
+    excluir: criando ? null : () => excluirOportunidade(op),
     enviar: async corpo => {
       const r = criando
         ? await chamarWorker('POST', '/api/oportunidades', corpo)

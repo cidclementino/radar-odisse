@@ -97,3 +97,14 @@ test('Corretor do ZAP sem canal continua fundindo pelo nome', () => {
   assert.equal(corretores.get('c1').volume_zap, 2);
   assert.equal(vinculos.get('zap-1'), 'c1');
 });
+
+test('YouTube: terreno e imóvel para retrofit', () => {
+  const { classificar } = require('../parsers/youtube');
+  const canal = { canalTitulo: 'Recife Imóveis', canalDescricao: '' };
+  assert.deepEqual(classificar({ titulo: 'Terreno 600m² aceita permuta', descricao: '', ...canal }), { nivel: 2, categoria: 'terreno' });
+  assert.deepEqual(classificar({ titulo: 'Vendo prédio comercial no Centro', descricao: 'Ideal para clínica ou escritório', canalTitulo: 'Fulano' }), { nivel: 2, categoria: 'imovel' });
+  assert.deepEqual(classificar({ titulo: 'Galpão à venda em Jaboatão', descricao: '1.200 m²', ...canal }), { nivel: 1, categoria: 'imovel' });
+  assert.deepEqual(classificar({ titulo: 'Casarão histórico precisa de reforma', descricao: '', canalTitulo: 'Vlog' }), { nivel: 2, categoria: 'imovel' });
+  assert.equal(classificar({ titulo: 'Apartamento no edifício comercial', descricao: 'prédio comercial', ...canal }), null, 'apartamento é ruído');
+  assert.equal(classificar({ titulo: 'Galpão à venda', descricao: '', canalTitulo: 'Vlog de viagem' }), null, 'sem sinal nem corretor');
+});

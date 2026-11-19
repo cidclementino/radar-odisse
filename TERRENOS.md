@@ -235,6 +235,29 @@ criados à mão no painel (lápis em cada cartão e linha; botões "Novo terreno
 Próximo passo: ver `universo-radar-funil` no projeto Universo ("Levar aos Contatos",
 "Enviar ao funil").
 
+## Imóveis para retrofit (nov/2026)
+
+Além de terrenos, a aba registra **imóveis à venda que pedem projeto de reforma**: prédio inteiro,
+prédio ou imóvel comercial, galpão, casarão, sobrado comercial, imóvel antigo. O raciocínio é o do
+terreno: quem compra vai precisar de projeto, e o corretor é o contato. Fica na mesma aba (não numa
+nova) porque reaproveita tudo: corretor, fusão, níveis, edição manual e, depois, o "Enviar ao funil".
+
+- Campo **`categoria`** na oportunidade: `terreno` (padrão; OLX, ZAP e tudo que já existia) ou
+  `imovel`. Editável no lápis; filtro "Terrenos e imóveis" no painel; selo "Imóvel para retrofit".
+- **Fonte por ora: só o YouTube.** Buscas a mais na rotação: RM João Pessoa (prédio, galpão, imóvel
+  comercial, casarão no Centro Histórico), Campina Grande (prédio, galpão), RM Recife (prédio,
+  galpão, casarão em Olinda), RM Natal (prédio, galpão). Litoral Sul sem busca de retrofit. São até
+  4 buscas a mais por dia (400 unidades de cota; sobra folgada).
+- **Nível** (`classificar()` em `parsers/youtube.js`, sobre título + descrição completa, sem acento):
+  - 2 — tipo de imóvel + sinal de reforma ou mudança de uso ("para reforma", "retrofit", "ideal
+    para clínica/escola/escritório…", "oportunidade de investimento", "aceita permuta");
+  - 1 — tipo de imóvel + canal de corretor ou imobiliária;
+  - fora — título de apartamento, lançamento ou "na planta" (busca de "prédio" traz muito disso).
+- Vídeo que fala de terreno segue a regra de terreno, mesmo que cite galpão.
+- OLX e ZAP continuam só com terrenos: as duas respondem 403 na coleta do GitHub Actions. Se
+  voltarem, a categoria "Comércio e indústria" da OLX é o caminho para imóveis.
+- No "Enviar ao funil", levar a categoria no `origem_detalhe` (terreno ou imóvel).
+
 ## Pendências que restam
 
 - [x] Chave da YouTube Data API v3 (`YOUTUBE_API_KEY`) — feita.

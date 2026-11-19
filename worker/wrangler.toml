@@ -9,6 +9,9 @@ kv_namespaces = [
   { binding = "REVISAO", id = "34ddf653fcf044ea9871dc072844493d" },
   { binding = "OPORTUNIDADES", id = "6f2980b7894b4b7eb1582795b996b0f4" },
   { binding = "CORRETORES", id = "d2e2967d78be465c81937cb130bd20c0" },
+  # Licitações (PNCP): o id é posto pelo workflow de publicação (.github/workflows/worker.yml), que
+  # acha ou cria o namespace "radar-odisse-LICITACOES". Para publicar à mão, troque pelo id real.
+  { binding = "LICITACOES", id = "__LICITACOES_ID__" },
 ]
 
 # Defina com: wrangler secret put COLLECT_SECRET

@@ -1,12 +1,13 @@
 # Radar Odisse
 
-Painel interno com duas abas: **Concursos** (editais de arquitetura/design) e
-**Terrenos** (oportunidades de terrenista e corretor) — estático, sem custo de
-infraestrutura pesada, no mesmo espírito do `odisse-orcamentos`.
+Painel interno com três abas: **Concursos** (editais de arquitetura/design),
+**Terrenos** (terrenos e imóveis para retrofit, por terrenista e corretor) e **Licitações**
+(contratações públicas de projeto, pelo PNCP) — estático, sem custo de infraestrutura pesada,
+no mesmo espírito do `odisse-orcamentos`.
 
 As decisões de produto e a lógica de dedup/interface estão documentadas em
-detalhe em [`RADAR.md`](./RADAR.md) (Concursos) e [`TERRENOS.md`](./TERRENOS.md)
-(Terrenos) — vale ler antes de mexer no código.
+detalhe em [`RADAR.md`](./RADAR.md) (Concursos), [`TERRENOS.md`](./TERRENOS.md)
+(Terrenos) e [`LICITACOES.md`](./LICITACOES.md) (Licitações) — vale ler antes de mexer no código.
 
 ## Arquitetura
 

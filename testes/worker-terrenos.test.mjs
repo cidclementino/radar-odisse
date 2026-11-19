@@ -24,7 +24,7 @@ const kv = () => {
     async list() { return { keys: [...m.keys()].map(name => ({ name })), list_complete: true }; },
   };
 };
-const env = { COLLECT_SECRET: 's', RADAR_SENHA: 'p', CONCURSOS: kv(), REVISAO: kv(), OPORTUNIDADES: kv(), CORRETORES: kv() };
+const env = { COLLECT_SECRET: 's', RADAR_SENHA: 'p', CONCURSOS: kv(), REVISAO: kv(), OPORTUNIDADES: kv(), CORRETORES: kv(), LICITACOES: kv() };
 const ctx = { waitUntil() {} };
 const eq = (a, b, nome) => assert.deepEqual(a, b, nome);
 
@@ -55,6 +55,43 @@ test('edição manual de corretores e terrenos convive com a coleta', async () =
   eq(rv.nome,'Ricardo Vieira','nome'); eq(rv.whatsapp,'+5583988881111','wpp mantido'); eq(rv.email,null,'email esvaziado à mão fica vazio'); eq(rv.regioes_atuacao,['João Pessoa','Cabedelo'],'regioes manuais'); eq(rv.oportunidades_vinculadas,[],'não religa op ligada à mão');
   let [st5]=await call('PATCH','/api/oportunidades/op1',{corretor_vinculado_id:'nao-existe'}); eq(st5,400,'corretor inexistente');
   let [st6]=await call('PATCH','/api/oportunidades/op1',{titulo:'x'},'errada'); eq(st6,401,'sem senha');
-  
-  
+  // categoria: a coleta grava 'terreno' por padrão e o painel pode trocar para imóvel
+  eq(op1.categoria,'terreno','categoria padrão');
+  await call('POST','/api/collect-terrenos',{oportunidades:[{id:'op2',titulo:'Prédio comercial à venda',local:'RM Recife',categoria:'imovel',status_interno:'monitorando',nivel_maturidade:2}],corretoresCandidatos:[]},'s');
+  eq((await env.OPORTUNIDADES.get('op2','json')).categoria,'imovel','imóvel da coleta');
+  let [st7,r7]=await call('PATCH','/api/oportunidades/op1',{categoria:'imovel'}); eq(st7,200,'troca categoria'); eq(r7.oportunidade.categoria,'imovel','categoria');
+  let [st8]=await call('PATCH','/api/oportunidades/op1',{categoria:'casa'}); eq(st8,400,'categoria inválida');
+});
+
+test('licitações: coleta mantém a decisão do painel e o resto vem do PNCP', async () => {
+  const call=async(m,path,body,tok='p')=>{const r=await w.fetch(new Request('https://x'+path,{method:m,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}),env,ctx);return [r.status,await r.json()]};
+  const lic={id:'pncp-1-1-000001-2026',objeto:'Elaboração de projeto arquitetônico',encerramento:'2026-12-01T09:00:00',valor_estimado:100000,status_interno:'monitorando',coletado_em:'2026-11-18T00:00:00Z'};
+  let [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[lic]},'p'); eq(st,401,'coleta exige o segredo da coleta');
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[lic,{id:'outra',objeto:'x'}]},'s'); eq(st,200,'coleta'); eq([r.recebidas,r.novas],[1,1],'só ids do PNCP');
+  [st,r]=await call('PATCH','/api/licitacoes/'+lic.id,{status_interno:'participando',observacoes:'  visitar o terreno  '}); eq(st,200,'patch'); eq(r.observacoes,'visitar o terreno','obs');
+  [st]=await call('PATCH','/api/licitacoes/'+lic.id,{status_interno:'ganha'}); eq(st,400,'situação inválida');
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[{...lic,coletado_em:'2026-11-20T00:00:00Z'}]},'s'); eq([r.novas,r.alteradas,r.iguais],[0,0,1],'igual não regrava');
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[{...lic,encerramento:'2026-12-10T09:00:00',coletado_em:'2026-11-25T00:00:00Z'}]},'s'); eq([r.novas,r.alteradas],[0,1],'retificação regrava');
+  const l=await env.LICITACOES.get(lic.id,'json');
+  eq(l.status_interno,'participando','situação mantida'); eq(l.observacoes,'visitar o terreno','obs mantida'); eq(l.coletado_em,'2026-11-18T00:00:00Z','primeira coleta'); eq(l.encerramento,'2026-12-10T09:00:00','prazo retificado vem do PNCP');
+  [st,r]=await call('GET','/api/licitacoes'); eq(st,200,'lista'); eq(r.length,1,'um item');
+  // contratada: entra com outro id, liga a aberta e tem situações próprias
+  const ct={id:'pncpc-9-2-000003-2026',fase:'contratada',licitacao_id:lic.id,objeto:'Construção da creche',vencedor:{cnpj:'1',nome:'Construtora X'},status_interno:'monitorando'};
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[ct]},'s'); eq(r.novas,1,'contratada nova');
+  eq((await env.LICITACOES.get(lic.id,'json')).contrato_id,ct.id,'aberta aponta para o contrato');
+  [st]=await call('PATCH','/api/licitacoes/'+ct.id,{status_interno:'participando'}); eq(st,400,'situação de aberta não vale');
+  [st,r]=await call('PATCH','/api/licitacoes/'+ct.id,{status_interno:'contatado'}); eq(st,200,'contatado'); eq(r.status_interno,'contatado','ok');
+  // lote grande demais
+  [st]=await call('POST','/api/collect-licitacoes',{licitacoes:Array.from({length:51},(_,i)=>({id:'pncp-x'+i}))},'s'); eq(st,413,'lote máximo');
+  // cópia da lista sem o texto complementar das contratadas
+  await call('POST','/api/collect-licitacoes',{licitacoes:[{id:'pncpc-z',fase:'contratada',fonte:'pncp.gov.br',informacao_complementar:'x'.repeat(900),assinatura:'2025-01-10',status_interno:'monitorando'}]},'s');
+  const copia=JSON.parse(env.LICITACOES.m.get('_lista'));
+  eq('informacao_complementar' in copia.itens['pncpc-z'],false,'cópia enxuta');
+  eq(JSON.parse(env.LICITACOES.m.get('pncpc-z')).informacao_complementar.length,900,'registro completo');
+  // limpeza: contratada velha sai e deixa lápide; a em contato fica; a coleta não traz a apagada de volta
+  [st,r]=await call('POST','/api/manutencao/limpar-licitacoes',{},'s'); eq(r.apagadas,1,'uma apagada');
+  eq(env.LICITACOES.m.has('pncpc-z'),false,'apagada'); eq(env.LICITACOES.m.has('_ignorado:pncpc-z'),true,'lápide');
+  eq(env.LICITACOES.m.has(ct.id),true,'em contato fica');
+  [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[{id:'pncpc-z',fase:'contratada',fonte:'pncp.gov.br'}]},'s'); eq(r.ignoradas,1,'não volta');
+  eq(JSON.parse(env.LICITACOES.m.get('_lista')).itens['pncpc-z'],undefined,'fora da lista');
 });

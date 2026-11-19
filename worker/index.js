@@ -5,6 +5,7 @@
 //   - KV Namespace `REVISAO`         -> id -> { candidato_existente, candidato_novo, motivo, criado_em }
 //   - KV Namespace `OPORTUNIDADES`   -> id -> Oportunidade (JSON) — aba Terrenos
 //   - KV Namespace `CORRETORES`      -> id -> Corretor (JSON) — aba Terrenos
+//   - KV Namespace `LICITACOES`      -> id -> Licitação (JSON) — aba Licitações (PNCP)
 //   - Variável de ambiente `COLLECT_SECRET` -> string compartilhada com o GitHub Actions
 //
 // Rotas:
@@ -21,6 +22,10 @@
 //   GET    /api/oportunidades      -> lista todas as Oportunidades (Terrenos)
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
+//   GET    /api/licitacoes         -> lista as Licitações (PNCP)
+//   PATCH  /api/licitacoes/:id     -> situação e observações de uma Licitação
+//   POST   /api/collect-licitacoes -> recebe { licitacoes } da coleta do PNCP, em lotes de até 50 (segredo da coleta)
+//   POST   /api/manutencao/limpar-licitacoes -> apaga encerradas antigas e contratadas velhas ou descartadas (idem)
 //
 // SENHA (nov/2026): todas as rotas exigem `Authorization: Bearer <RADAR_SENHA>` (a senha do painel,
 // secret do Worker, como nas outras ferramentas do Odisse) ou `Bearer <COLLECT_SECRET>` (coleta no
@@ -46,6 +51,7 @@ import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
+import { coletarLicitacoes, patchLicitacao, limparLicitacoes } from './licitacoes.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -530,6 +536,8 @@ async function handleCollectTerrenos(request, env) {
     const gravar = {
       ...(antiga || {}),
       ...op,
+      // terreno ou imóvel para retrofit (TERRENOS.md); OLX e ZAP só trazem terrenos
+      categoria: op.categoria || antiga?.categoria || 'terreno',
       corretor_vinculado_id: vinculos.get(op.id) || antiga?.corretor_vinculado_id || op.corretor_vinculado_id || null,
     };
     if (antiga) {
@@ -563,9 +571,19 @@ async function handleCollectTerrenos(request, env) {
 // O KV aceita 1 gravação por segundo na mesma chave: se a gravação da cópia for recusada,
 // tenta de novo depois de 1 s.
 
-const LISTAS = ['CONCURSOS', 'REVISAO', 'OPORTUNIDADES', 'CORRETORES'];
+const LISTAS = ['CONCURSOS', 'REVISAO', 'OPORTUNIDADES', 'CORRETORES', 'LICITACOES'];
 const CHAVE_COPIA = '_lista';
 const COPIA_VALIDADE_MS = 60 * 60 * 1000;
+
+// A cópia da lista leva só o que as páginas mostram. Licitações (PNCP): o texto complementar sai
+// das contratadas e encurta nas abertas — a cópia é lida e interpretada a cada página aberta, e o
+// plano gratuito dá 10 ms de processamento por pedido. O registro completo continua na chave dele.
+function enxugar(item) {
+  if (!item || item.fonte !== 'pncp.gov.br' || !item.informacao_complementar) return item;
+  const { informacao_complementar: comp, ...resto } = item;
+  if (item.fase === 'contratada') return resto;
+  return { ...resto, informacao_complementar: comp.length > 600 ? `${comp.slice(0, 600)}…` : comp };
+}
 
 async function montarCopia(kv) {
   const itens = {};
@@ -574,7 +592,7 @@ async function montarCopia(kv) {
     const page = await kv.list({ cursor });
     const chaves = page.keys.filter(k => !k.name.startsWith('_'));
     const valores = await Promise.all(chaves.map(k => kv.get(k.name, 'json')));
-    chaves.forEach((k, i) => { if (valores[i]) itens[k.name] = valores[i]; });
+    chaves.forEach((k, i) => { if (valores[i]) itens[k.name] = enxugar(valores[i]); });
     cursor = page.list_complete ? undefined : page.cursor;
   } while (cursor);
   return { em: Date.now(), itens };
@@ -628,7 +646,7 @@ async function aplicarNaCopia(env, nome, mudancas) {
   else {
     for (const [chave, valor] of mudancas) {
       if (valor === null) delete copia.itens[chave];
-      else { try { copia.itens[chave] = JSON.parse(valor); } catch { /* valor não-JSON: não entra na lista */ } }
+      else { try { copia.itens[chave] = enxugar(JSON.parse(valor)); } catch { /* valor não-JSON: não entra na lista */ } }
     }
   }
   await gravarCopia(kv, copia);
@@ -764,6 +782,23 @@ async function rotear(request, env, ctx) {
 
     if (request.method === 'POST' && url.pathname === '/api/collect-terrenos') {
       return handleCollectTerrenos(request, env);
+    }
+
+    // Licitações (PNCP) — worker/licitacoes.js
+    if (request.method === 'GET' && url.pathname === '/api/licitacoes') {
+      return json(await listarRapido(env.LICITACOES, ctx, fresco));
+    }
+    if (request.method === 'POST' && url.pathname === '/api/collect-licitacoes') {
+      if (!autorizado(request, env)) return json({ error: 'não autorizado' }, 401);
+      return coletarLicitacoes(request, env, json);
+    }
+    if (request.method === 'POST' && url.pathname === '/api/manutencao/limpar-licitacoes') {
+      if (!autorizado(request, env)) return json({ error: 'não autorizado' }, 401);
+      return limparLicitacoes(env, json);
+    }
+    const matchLicitacao = url.pathname.match(/^\/api\/licitacoes\/([^/]+)$/);
+    if (request.method === 'PATCH' && matchLicitacao) {
+      return patchLicitacao(request, env, decodeURIComponent(matchLicitacao[1]), json);
     }
 
     return json({ error: 'não encontrado' }, 404);

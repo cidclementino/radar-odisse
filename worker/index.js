@@ -823,7 +823,42 @@ const TZ_BR = 'America/Sao_Paulo';
 const diaBR = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
 const OCULTOS_TERRENO = new Set(['descartado', 'abordado', 'no_funil']);
 
+// Mapa de preços do Universo (Cid, 19/11): os contratos só de projeto (Brasil inteiro, PNCP) e os
+// concursos com a contratação do vencedor. Só dados públicos de origem; a situação e as observações do
+// painel do Radar não saem daqui.
+function paraPreco(l) {
+  const tr = l.tr || null;
+  return {
+    id: l.id, objeto: l.objeto, orgao: l.orgao, esfera: l.esfera, municipio: l.municipio, uf: l.uf,
+    escopo: l.escopo || [], contratada: l.vencedor?.nome || null, pessoa: l.vencedor?.pessoa || null,
+    valor: typeof l.valor_global === 'number' ? l.valor_global / 100 : null, assinatura: l.assinatura || null,
+    link: l.link_pncp || null,
+    contrato: l.documentos?.contrato?.url || null, tr: l.documentos?.tr?.url || null, tr_tipo: l.documentos?.tr?.tipo || null,
+    leitura: tr ? { legivel: !!tr.legivel, erro: tr.erro || null, area_m2: tr.area_m2 ?? null, fases: tr.fases || [], disciplinas: tr.disciplinas || [], bim: !!tr.bim, prazo: tr.prazo ? { valor: tr.prazo.valor, unidade: tr.prazo.unidade } : null } : null,
+  };
+}
+
 export class Universo extends WorkerEntrypoint {
+  async precos() {
+    const [licitacoes, concursos] = await Promise.all([
+      listarRapido(this.env.LICITACOES, this.ctx, false),
+      listarRapido(this.env.CONCURSOS, this.ctx, false),
+    ]);
+    const contratos = licitacoes
+      .filter((l) => l.fase === 'contratada' && l.tipo_objeto === 'projeto' && l.status_interno !== 'descartado')
+      .map(paraPreco);
+    const conc = concursos
+      .filter((c) => c.status_interno !== 'descartado' && (c.contratacao || c.acompanhamento?.site?.contratacao?.length))
+      .map((c) => ({
+        id: c.id, nome: c.apelido || c.nome, promotor: c.promotor || null, local: c.local_projeto || null, tipo: c.tipo || null,
+        premio: c.premio || null, contratacao: c.contratacao || null, linhas: c.acompanhamento?.site?.contratacao || [],
+        areas: c.acompanhamento?.site?.areas || [], link: c.link_oficial || c.fonte_url_original || null,
+        inscricao_fim: c.datas?.inscricao_fim || null,
+      }));
+    return { em: new Date().toISOString(), contratos, concursos: conc };
+  }
+
+
   async novidades(dia) {
     const alvo = /^\d{4}-\d{2}-\d{2}$/.test(dia || '') ? dia : diaBR(new Date());
     const doDia = (x) => {

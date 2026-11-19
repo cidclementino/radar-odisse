@@ -38,17 +38,40 @@ const RE_OUTRO_PROJETO = /(tecnico social|\bpts\b|projeto de extensao|area degra
 const RE_SO_COMPLEMENTAR = /(incendio|panico|pscip|avcb|clcb|eletric|spda|hidraulic|hidrossanit|estrutura(l|is)|automacao|ventilacao|terraplen|pavimenta|drenagem|iluminacao publica|\bip\b)/;
 const RE_ARQUITETURA_NOMEADA = /(arquitetonic|projet\w*\s+(\S+\s+){0,2}?de arquitetura|de urbanismo|urbanistic|paisagistic|paisagismo|interiores|restaur|mobiliario|plano diretor)/;
 
+// Revisto com a primeira carga (30 dias, 19/11/2026): obra feita "conforme projeto arquitetônico",
+// sondagem, coffee break, consultoria jurídica, projeto social, PPCI, pavimentação etc. passavam.
+// "conforme o projeto arquitetônico…" fala do projeto que a obra segue, não de um projeto contratado.
+const RE_PROJETO_DE_REFERENCIA = /\b(conforme|de acordo com|segundo|com base n[oa]s?|nos termos d[oa]s?)\s+(\S+\s+){0,3}?projet\w*(\s+\S+){0,2}/g;
+// A primeira ação do objeto: se é construir, executar, implantar, fornecer, comprar ou sondar antes de
+// elaborar, o contrato não é de projeto.
+const RE_PRIMEIRA_ACAO_FORA = /\b(construcao|execucao|implantacao|fornecimento|aquisicao|locacao|sondagem|instalacao|realizacao de levantamento topografico)\b/;
+const RE_NAO_ARQUITETURA = /((consultoria|assessoria) (\S+ ){0,2}?juridic|docente|pesquisa aplicada|museolog|turistic|turismo|natalin|cenograf|naval|\bbalsa\b|transporte escolar|limpeza urbana|residuos solidos|valorizacao de residuos|recape|restauracao de pavimentos|passagem molhada|\bppci\b|controle de acesso|acrescimo quantitativo|projeto (denominado|intitulado)|projetos? de pesquisa|selecao de projetos|apoio financeiro|vistoria tecnica|laudo tecnico|engenharia de custos|crianc|adolescent|idosos|professor|participantes|sinalizacao)/;
+
+/** Texto com acentos estragados ("ContrataÃ§Ã£o") volta a ser UTF-8. */
+function repararTexto(s) {
+  if (!s || !/Ã[\u0080-\u00bf]/.test(s)) return s;
+  try {
+    const bytes = Uint8Array.from([...s].map(ch => ch.charCodeAt(0) & 0xff));
+    const r = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    return r;
+  } catch { return s; }
+}
+
 /** Contrato só de projeto de arquitetura/urbanismo (para o mapa de preços) — devolve a classe ou null. */
 function classificarContratoProjeto(c) {
   if (!c || c.receita === true) return null;
   if (RE_TIPO_FORA.test(normalizeText(c.tipoContrato?.nome))) return null;
   const valor = Number(c.valorGlobal ?? c.valorInicial);
   if (!(valor >= PROJETO_VALOR_MINIMO)) return null;
-  const t = normalizeText(c.objetoContrato);
-  const como = classificarObjeto(c.objetoContrato);
+  const objeto = repararTexto(c.objetoContrato);
+  const t = normalizeText(objeto).replace(RE_PROJETO_DE_REFERENCIA, ' ');
+  const como = classificarObjeto(t);
   if (!como || como.tipo_objeto !== 'projeto') return null;
-  if (!RE_ELABORA_PROJETO.test(t)) return null;
-  if (RE_FAZ_OBRA.test(t) || RE_COMPRA.test(t) || RE_OUTRO_PROJETO.test(t)) return null;
+  const elabora = t.search(RE_ELABORA_PROJETO);
+  if (elabora < 0) return null;
+  const acaoFora = t.search(RE_PRIMEIRA_ACAO_FORA);
+  if (acaoFora >= 0 && acaoFora < elabora) return null;
+  if (RE_FAZ_OBRA.test(t) || RE_COMPRA.test(t) || RE_OUTRO_PROJETO.test(t) || RE_NAO_ARQUITETURA.test(t)) return null;
   if (RE_SO_COMPLEMENTAR.test(t) && !RE_ARQUITETURA_NOMEADA.test(t)) return null;
   return { nivel: null, tipo_objeto: 'projeto', escopo: como.escopo.filter(e => e !== 'complementares').length ? como.escopo : ['arquitetura', ...como.escopo] };
 }
@@ -113,7 +136,7 @@ function paraContratada(c, agora = new Date().toISOString()) {
     fonte: 'pncp.gov.br',
     numero_controle: c.numeroControlePNCP,
     licitacao_id: idCompra(c.numeroControlePncpCompra),
-    objeto: texto(c.objetoContrato),
+    objeto: texto(repararTexto(c.objetoContrato)),
     informacao_complementar: texto(c.informacaoComplementar)?.slice(0, 2000) || null,
     ...classe,
     orgao: texto(orgao.razaoSocial),
@@ -153,4 +176,4 @@ function contatoDaReceita(r) {
   };
 }
 
-module.exports = { classificarContrato, classificarContratoProjeto, paraContratada, contatoDaReceita, idContrato, UFS, VALOR_MINIMO };
+module.exports = { classificarContrato, classificarContratoProjeto, repararTexto, paraContratada, contatoDaReceita, idContrato, UFS, VALOR_MINIMO };

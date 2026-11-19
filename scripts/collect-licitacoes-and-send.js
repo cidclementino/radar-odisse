@@ -8,6 +8,25 @@ const pncp = require('../parsers/pncp');
 const contratos = require('../parsers/pncp-contratos');
 const { completarDocumentos } = require('../parsers/pncp-documentos');
 
+// Contratos só de projeto já guardados que não passam mais no filtro atual (o filtro foi apertado
+// depois da primeira carga): viram "descartado", que a limpeza apaga. Só os que ninguém mexeu.
+async function revisarProjetosGuardados(guardadas) {
+  const { classificarContratoProjeto } = require('../parsers/lib/contratos');
+  const hoje = new Date().toISOString().slice(0, 10);
+  let n = 0;
+  for (const l of guardadas) {
+    if (l.fase !== 'contratada' || l.tipo_objeto !== 'projeto' || l.status_interno !== 'monitorando' || l.observacoes) continue;
+    if (classificarContratoProjeto({ objetoContrato: l.objeto, valorGlobal: (l.valor_global || 0) / 100, tipoContrato: { nome: 'Contrato' } })) continue;
+    const r = await fetch(`${WORKER_URL}/api/licitacoes/${encodeURIComponent(l.id)}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${COLLECT_SECRET}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status_interno: 'descartado', observacoes: `Fora do filtro de contratos só de projeto (revisto em ${hoje}).` }),
+    });
+    if (r.ok) n++;
+  }
+  if (n) console.log(`${n} contratos só de projeto guardados saíram no filtro revisto (descartados).`);
+}
+
 async function main() {
   const { WORKER_URL, COLLECT_SECRET } = process.env;
   if (!WORKER_URL || !COLLECT_SECRET) {
@@ -32,8 +51,11 @@ async function main() {
   try {
     const res = await fetch(`${WORKER_URL}/api/licitacoes`, { headers: { Authorization: `Bearer ${COLLECT_SECRET}` } });
     const guardadas = res.ok ? await res.json() : [];
-    const prontos = new Set(guardadas.filter(l => l.documentos).map(l => l.id));
+    // O TR que não abriu por erro do leitor (não do arquivo) é lido de novo.
+    const releitura = l => /^não abriu/.test(l.tr?.erro || '');
+    const prontos = new Set(guardadas.filter(l => l.documentos && !releitura(l)).map(l => l.id));
     await completarDocumentos(licitacoes, prontos);
+    await revisarProjetosGuardados(guardadas);
   } catch (err) {
     console.error('Documentos falharam (a coleta segue sem eles):', err.message);
   }

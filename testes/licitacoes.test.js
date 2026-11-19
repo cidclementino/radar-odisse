@@ -136,6 +136,9 @@ test('Contratos só de projeto entram, do Brasil inteiro, sem nível', () => {
   };
   entra('CONTRATAÇÃO DE SERVIÇOS DE ARQUITETURA E URBANISMO PARA A ELABORAÇÃO DO PROJETO EXECUTIVO DE RESTAURAÇÃO DAS FACHADAS DO PRÉDIO SEDE DA SUPERINTENDÊNCIA DO PATRIMÔNIO DA UNIÃO');
   entra('ELABORAÇÃO DO PROJETO EXECUTIVO DE REFORMA DOS TELHADOS NO BLOCO A DA FACULDADE DE EDUCAÇÃO');
+  entra('CONTRATAÇÃO DE EMPRESA ESPECIALIZADA PARA A PRESTAÇÃO DE SERVIÇOS TÉCNICOS DE ENGENHARIA, COMPREENDENDO A ELABORAÇÃO DE ESTUDOS E PROJETOS DE ENGENHARIA DESTINADOS À CONSTRUÇÃO DA CASA DO PRODUTOR, EDIFICAÇÃO PREVISTA COM 04 PAVIMENTOS E ÁREA TOTAL ESTIMADA DE 2.800,00 M');
+  // acentos estragados na origem
+  const c = entra('ContrataÃ§Ã£o de serviÃ§os tÃ©cnicos especializados de engenharia e arquitetura para elaboraÃ§Ã£o de projeto bÃ¡sico e projeto executivo para ampliaÃ§Ã£o e reforma da sede da CÃ¢mara Municipal');
   entra('Elaboração de projeto executivo de mobiliário fixo para a UBS Santa Rita, conforme Memoriais Descritivos, Planilha Orçamentária, Cronograma.');
   entra('CONTRATAÇÃO DE SERVIÇOS ESPECIAIS DE ARQUITETURA E ENGENHARIA PARA ELABORAÇÃO DO PROJETO EXECUTIVO DE ARQUITETURA, COORDENAÇÃO, COMPATIBILIZAÇÃO E FORNECIMENTO DOS PROJETOS EXECUTIVOS DE ESTRUTURA, HIDRÁULICA, ELÉTRICA, MECÂNICA, COM MODELO EM BIM');
   // pessoa física também entra (o CPF não é guardado)
@@ -157,6 +160,12 @@ test('Contratos que não são só projeto de arquitetura ficam fora do mapa de p
   fora('A presente contratação tem por objeto a elaboração, atualização ou substituição do Projeto de Segurança Contra Incêndio e Pânico – PSCIP dos Edifícios da sede');
   fora('CONTRATAÇÃO PARA PRESTAÇÃO DE SERVIÇOS TÉCNICOS ESPECIALIZADOS NA ELABORAÇÃO E IMPLANTAÇÃO DO PROJETO TÉCNICO SOCIAL (PTS), REFERENTE AO EMPREENDIMENTO HABITACIONAL');
   fora('PRESTAÇÃO DE SERVIÇOS TÉCNICOS DE ARQUITETURA, ENGENHARIA CIVIL E AGRONOMIA, EM CARÁTER TEMPORÁRIO, QUANDO HOUVER INTERESSE', { valorGlobal: 0.01 });
+  // da primeira carga (30 dias): obra "conforme projeto arquitetônico", sondagem, serviços que não são arquitetura
+  fora('Contratação de empresa especializada para Construção do Centro de Referência de Assistência Social – CRAS, com área construída de aproximadamente 200,00 m², conforme projetos arquitetônicos, memorial descritivo, planilha orçamentária');
+  fora('Contratação de serviços especializados de Sondagem Geológica à Percussão e de Levantamento Planialtimétrico, destinados a subsidiar a elaboração de projetos de construção, reforma ou adequação de edificações');
+  fora('Contratacao de empresa especializada para o fornecimento de coffee break, refeicoes tipo marmitex e kits lanche, destinados aos eventos do processo de Revisao do Plano Diretor Participativo');
+  fora('IMPLANTAÇÃO DO PROJETO PAISAGÍSTICO DA FMUSP');
+  fora('CONTRATAÇÃO DE EMPRESA ESPECIALIZADA EM ELABORAÇÃO DE PROJETOS DE PPCI PARA O GINÁSIO MÁRIO CANELA');
   fora('ELABORAÇÃO DA REVISÃO E ATUALIZAÇÃO DOS PROJETOS EXECUTIVOS DE TERRAPLENAGEM, PAVIMENTAÇÃO E DRENAGEM DA OBRA DE CONSTRUÇÃO DA NOVA SEDE, SERVIÇOS DE ENGENHARIA E/OU ARQUITETURA');
 });
 

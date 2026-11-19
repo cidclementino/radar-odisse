@@ -125,6 +125,13 @@ coleta, o mapa lê do Radar.
   acompanha obra como objeto principal, é projeto social ou ambiental, é só de disciplina complementar
   ou infraestrutura (incêndio, elétrica, terraplenagem) sem arquitetura, ou tem valor simbólico (< R$ 1 mil,
   típico de credenciamento). Na amostra: 66 candidatos pelo filtro antigo → 23 projetos de fato.
+- **Revisto com a primeira carga** (30 dias, 19/11/2026; 144 contratos, uns 30 sem ser projeto): obra
+  feita "conforme projeto arquitetônico" (a frase é ignorada), objeto cuja primeira ação é construir,
+  executar, implantar, fornecer, comprar ou sondar, e serviços que não são arquitetura (consultoria
+  jurídica, docente, turismo, decoração natalina, PPCI, pavimentação, projeto social…) ficam fora.
+  Acentos estragados na origem ("ContrataÃ§Ã£o") são consertados. A cada coleta, os contratos de
+  projeto já guardados que não passam mais no filtro viram "descartado" (se ninguém mexeu neles) e a
+  limpeza os apaga.
 - **No painel ficam ocultos**: aparecem só com o filtro "Só projeto (mapa de preços)" na aba
   Contratadas, com cartão próprio (sem nível nem contato) e lista com R$/m². Não contam no contador.
 - **Não saem na limpeza** por idade (só se descartados): são o histórico de preços.
@@ -152,6 +159,8 @@ contratadas), `tr` (o termo de referência) e `edital` (nas abertas). Vêm da AP
   PDF escaneado (sem texto), compactado ou do Word fica `legivel: false` com o motivo.
 - A cópia da lista leva só os valores do TR; os trechos vêm de `GET /api/licitacoes/:id` ao abrir.
 - Teste à mão de um PDF: `node parsers/pncp-documentos.js <url do arquivo no PNCP>`.
+- **Node 22**: o `unpdf` usa recursos do Node 22; no Node 20 nenhum PDF abria (primeira carga). O TR que
+  ficou com erro do leitor ("não abriu…") é lido de novo na coleta seguinte que pegar o item.
 
 ## Uso da Cloudflare (plano gratuito)
 

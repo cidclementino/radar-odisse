@@ -109,6 +109,27 @@ e o Odisse se oferece como equipe de projeto dela.
 - Mesmo KV (`LICITACOES`), com `fase: 'contratada'` e id `pncpc-…`. Interface: aba "Contratadas" na
   página, com cartão no desenho de Terrenos (borda pelo nível) e a vencedora em destaque.
 
+## Uso da Cloudflare (plano gratuito)
+
+Limites que pesam: 1.000 gravações de KV por dia, 100.000 leituras por dia, 1.000 operações de KV
+por pedido ao Worker e 10 ms de processamento por pedido.
+
+- **Lotes de 50**: a coleta manda os itens em pedidos de até 50 (o Worker recusa mais, 413). Cada
+  item custa até ~5 operações (ler, conferir lápide, gravar, ligar à aberta). Sem isso, a primeira
+  carga de 60 dias (~350 contratos) passaria das 1.000 operações num pedido só.
+- **Só grava o que mudou**: compara o que veio do PNCP com o que está guardado (sem contar situação,
+  observações e datas da própria coleta). Igual = não grava. Consequência: `visto_em` marca a última
+  mudança, e o painel mostra "Atualizada em".
+- **Limpeza** a cada coleta (`/api/manutencao/limpar-licitacoes`, até 200 por vez, lendo só a cópia
+  da lista): sai a aberta encerrada há mais de 60 dias e a contratada descartada ou assinada há mais
+  de 6 meses. **Fica sempre** o que está em curso (acompanhando, participando, contatada, parceria).
+  A contratada apagada deixa uma lápide (`_ignorado:<id>`, expira em 150 dias) para a janela de 3
+  dias da coleta não trazê-la de volta.
+- **Cópia da lista enxuta**: sem o texto complementar nas contratadas e com ele cortado em 600
+  caracteres nas abertas. O registro completo continua na chave de cada item.
+- **Ordem de grandeza**: ~25 gravações por dia na coleta normal; ~350 no dia da carga de 60 dias
+  (não usar 120 junto com as outras coletas do dia).
+
 ## Próximos passos possíveis
 
 - "Enviar ao funil" (oportunidade no vendas, `origem = radar`), como em Terrenos. Nas contratadas,

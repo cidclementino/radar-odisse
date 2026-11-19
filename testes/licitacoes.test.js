@@ -106,3 +106,18 @@ test('Contratada vira item com vencedora, link e licitação de origem', () => {
   assert.deepEqual(ct.telefones, ['+558332221100']);
   assert.equal(ct.email, 'obras@exemplo.com.br');
 });
+
+test('Limpeza: o que sai e o que fica', async () => {
+  const { paraApagar } = await import('../worker/licitacoes.js');
+  const dias = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const itens = [
+    { id: 'a1', encerramento: `${dias(61)}T09:00:00`, status_interno: 'monitorando' },
+    { id: 'a2', encerramento: `${dias(30)}T09:00:00`, status_interno: 'monitorando' },
+    { id: 'a3', encerramento: `${dias(90)}T09:00:00`, status_interno: 'participando' },
+    { id: 'c1', fase: 'contratada', assinatura: dias(181), status_interno: 'monitorando' },
+    { id: 'c2', fase: 'contratada', assinatura: dias(10), status_interno: 'descartado' },
+    { id: 'c3', fase: 'contratada', assinatura: dias(10), status_interno: 'monitorando' },
+    { id: 'c4', fase: 'contratada', assinatura: dias(400), status_interno: 'parceria' },
+  ];
+  assert.deepEqual(paraApagar(itens).map(l => l.id), ['a1', 'c1', 'c2']);
+});

@@ -24,21 +24,33 @@ async function main() {
       console.error(`${nome} falhou:`, err.message);
     }
   }
-  if (!licitacoes.length) {
-    console.log('Nada nesta rodada — nada a enviar.');
-    return;
-  }
+  if (!licitacoes.length) console.log('Nada novo nesta rodada.');
 
-  const res = await fetch(`${WORKER_URL}/api/collect-licitacoes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${COLLECT_SECRET}` },
-    body: JSON.stringify({ licitacoes }),
-  });
-  if (!res.ok) {
-    console.error('Worker recusou a coleta:', res.status, await res.text());
-    process.exit(1);
+  // Lotes de 50: o Worker faz até ~5 operações de KV por item e o plano gratuito aceita 1.000 por pedido.
+  const LOTE = 50;
+  const total = { recebidas: 0, novas: 0, alteradas: 0, iguais: 0, ignoradas: 0 };
+  const chamar = async (caminho, corpo) => {
+    const res = await fetch(`${WORKER_URL}${caminho}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${COLLECT_SECRET}` },
+      body: JSON.stringify(corpo),
+    });
+    if (!res.ok) throw new Error(`Worker recusou ${caminho}: ${res.status} ${await res.text()}`);
+    return res.json();
+  };
+  for (let i = 0; i < licitacoes.length; i += LOTE) {
+    const r = await chamar('/api/collect-licitacoes', { licitacoes: licitacoes.slice(i, i + LOTE) });
+    for (const k of Object.keys(total)) total[k] += r[k] || 0;
+    await new Promise(ok => setTimeout(ok, 1100)); // a cópia da lista aceita 1 gravação por segundo
   }
-  console.log('Resultado:', await res.json());
+  console.log('Resultado:', total);
+
+  // Limpeza: abertas encerradas há mais de 60 dias, contratadas descartadas ou com mais de 6 meses.
+  try {
+    console.log('Limpeza:', await chamar('/api/manutencao/limpar-licitacoes', {}));
+  } catch (err) {
+    console.error('Limpeza falhou (a coleta foi gravada):', err.message);
+  }
 }
 
 main().catch(err => {

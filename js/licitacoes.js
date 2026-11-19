@@ -480,7 +480,7 @@ function render() {
 
   const el = document.getElementById('updated-at');
   const vistas = licitacoes.map(l => new Date(l.visto_em || l.coletado_em).getTime()).filter(t => !Number.isNaN(t));
-  el.textContent = vistas.length ? `Última coleta ${formatarData(new Date(Math.max(...vistas)).toISOString())}` : '';
+  el.textContent = vistas.length ? `Atualizada em ${formatarData(new Date(Math.max(...vistas)).toISOString())}` : '';
   const copia = cacheIdade(CHAVE);
   el.title = copia ? `Dados guardados neste navegador às ${formatarHora(copia)}` : '';
 }

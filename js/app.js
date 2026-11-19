@@ -202,6 +202,7 @@ function renderDetalhe(c) {
         ${campoDetalhe('Destinado a', c.destinado_a)}
         ${campoDetalhe('Inscrição', inscricaoTexto(c))}
         ${campoDetalhe('Prêmio', c.premio)}
+        ${campoDetalhe('Contratação do vencedor', c.contratacao)}
         ${campoDetalhe('Banca julgadora', banca)}
         ${campoDetalhe('Fim das inscrições', formatarData(c.datas?.inscricao_fim))}
         ${campoDetalhe('Entrega do projeto', formatarData(c.datas?.entrega_fim))}

@@ -89,7 +89,6 @@ test('Contratadas: o que fica fora', () => {
   assert.equal(classificarContrato(contrato('Construção da creche', { valorGlobal: 120000 })), null, 'pequena');
   assert.equal(classificarContrato(contrato('Construção da creche', { unidadeOrgao: { ufSigla: 'SP' } })), null, 'fora da região');
   assert.equal(classificarContrato(contrato('Construção da creche', { tipoContrato: { id: 2, nome: 'Termo Aditivo' } })), null, 'aditivo');
-  assert.equal(classificarContrato(contrato('Elaboração de projeto arquitetônico da creche', { categoriaProcesso: { id: 9 } })), null, 'só projeto é concorrente');
   assert.equal(classificarContrato(contrato('Manutenção predial preventiva e corretiva das escolas', { categoriaProcesso: { id: 9 } })), null, 'manutenção');
   assert.equal(classificarContrato(contrato('Aquisição de carteiras escolares', { categoriaProcesso: { id: 2 } })), null, 'compra');
 });
@@ -100,7 +99,7 @@ test('Contratada vira item com vencedora, link e licitação de origem', () => {
   assert.equal(c.licitacao_id, 'pncp-08778326000156-1-000095-2026');
   assert.equal(c.fase, 'contratada');
   assert.equal(c.valor_global, 250000000);
-  assert.deepEqual(c.vencedor, { cnpj: '12345678000190', nome: 'CONSTRUTORA EXEMPLO LTDA' });
+  assert.deepEqual(c.vencedor, { cnpj: '12345678000190', nome: 'CONSTRUTORA EXEMPLO LTDA', pessoa: 'juridica' });
   assert.equal(c.link_pncp, 'https://pncp.gov.br/app/contratos/08778326000156/2026/25');
   const ct = contatoDaReceita({ ddd_telefone_1: '8332221100', ddd_telefone_2: '', email: 'OBRAS@EXEMPLO.COM.BR', nome_fantasia: 'Exemplo', municipio: 'JOAO PESSOA', uf: 'PB' });
   assert.deepEqual(ct.telefones, ['+558332221100']);
@@ -118,6 +117,77 @@ test('Limpeza: o que sai e o que fica', async () => {
     { id: 'c2', fase: 'contratada', assinatura: dias(10), status_interno: 'descartado' },
     { id: 'c3', fase: 'contratada', assinatura: dias(10), status_interno: 'monitorando' },
     { id: 'c4', fase: 'contratada', assinatura: dias(400), status_interno: 'parceria' },
+    { id: 'p1', fase: 'contratada', tipo_objeto: 'projeto', assinatura: dias(400), status_interno: 'monitorando' },
+    { id: 'p2', fase: 'contratada', tipo_objeto: 'projeto', assinatura: dias(10), status_interno: 'descartado' },
   ];
-  assert.deepEqual(paraApagar(itens).map(l => l.id), ['a1', 'c1', 'c2']);
+  assert.deepEqual(paraApagar(itens).map(l => l.id), ['a1', 'c1', 'c2', 'p2']);
+});
+
+// ---------------------------------------------------------------- contratos só de projeto (mapa de preços)
+// Objetos reais da amostra do PNCP de 13 a 18/11/2026.
+
+test('Contratos só de projeto entram, do Brasil inteiro, sem nível', () => {
+  const entra = (objeto, extra = {}) => {
+    const c = classificarContrato(contrato(objeto, { categoriaProcesso: { id: 9 }, unidadeOrgao: { ufSigla: 'SC', municipioNome: 'Florianópolis' }, valorGlobal: 48400, ...extra }));
+    assert.ok(c, `devia entrar: ${objeto}`);
+    assert.equal(c.tipo_objeto, 'projeto', objeto);
+    assert.equal(c.nivel, null);
+    return c;
+  };
+  entra('CONTRATAÇÃO DE SERVIÇOS DE ARQUITETURA E URBANISMO PARA A ELABORAÇÃO DO PROJETO EXECUTIVO DE RESTAURAÇÃO DAS FACHADAS DO PRÉDIO SEDE DA SUPERINTENDÊNCIA DO PATRIMÔNIO DA UNIÃO');
+  entra('ELABORAÇÃO DO PROJETO EXECUTIVO DE REFORMA DOS TELHADOS NO BLOCO A DA FACULDADE DE EDUCAÇÃO');
+  entra('Elaboração de projeto executivo de mobiliário fixo para a UBS Santa Rita, conforme Memoriais Descritivos, Planilha Orçamentária, Cronograma.');
+  entra('CONTRATAÇÃO DE SERVIÇOS ESPECIAIS DE ARQUITETURA E ENGENHARIA PARA ELABORAÇÃO DO PROJETO EXECUTIVO DE ARQUITETURA, COORDENAÇÃO, COMPATIBILIZAÇÃO E FORNECIMENTO DOS PROJETOS EXECUTIVOS DE ESTRUTURA, HIDRÁULICA, ELÉTRICA, MECÂNICA, COM MODELO EM BIM');
+  // pessoa física também entra (o CPF não é guardado)
+  const pf = paraContratada(contrato('CONTRATAÇÃO DE PESSOA FÍSICA OU JURÍDICA PARA ELABORAÇÃO DE ANTEPROJETO URBANÍSTICO DE QUALIFICAÇÃO DA ENTRADA DA CIDADE DE NOVA FLORESTA-PB',
+    { tipoPessoa: 'PF', niFornecedor: '12345678901', valorGlobal: 25000, categoriaProcesso: { id: 9 } }));
+  assert.equal(pf.tipo_objeto, 'projeto');
+  assert.equal(pf.vencedor.cnpj, null);
+  assert.equal(pf.vencedor.pessoa, 'fisica');
+});
+
+test('Contratos que não são só projeto de arquitetura ficam fora do mapa de preços', () => {
+  const fora = (objeto, extra = {}) => {
+    const c = classificarContrato(contrato(objeto, { categoriaProcesso: { id: 9 }, unidadeOrgao: { ufSigla: 'SP' }, valorGlobal: 60000, ...extra }));
+    assert.ok(!c || c.tipo_objeto !== 'projeto', `devia ficar fora: ${objeto}`);
+  };
+  fora('Contratação de pessoa jurídica da área de arquitetura e/ou engenharia para elaboração de projetos executivos, bem como a execução de obra do CEU da Cultura');
+  fora('CONTRATAÇÃO DE SERVIÇOS ESPECIALIZADOS DE ARQUITETURA E ENGENHARIA PARA REFORMA DE PRÉDIO ESCOLAR');
+  fora('AQUISIÇÃO DE LICENÇAS DE USO, SOB A MODALIDADE DE ASSINATURA (SUBSCRIÇÃO), DE SOFTWARE DE AUTORIA BIM, DESTINADO À VISUALIZAÇÃO DE PROJETOS DE ARQUITETURA.');
+  fora('A presente contratação tem por objeto a elaboração, atualização ou substituição do Projeto de Segurança Contra Incêndio e Pânico – PSCIP dos Edifícios da sede');
+  fora('CONTRATAÇÃO PARA PRESTAÇÃO DE SERVIÇOS TÉCNICOS ESPECIALIZADOS NA ELABORAÇÃO E IMPLANTAÇÃO DO PROJETO TÉCNICO SOCIAL (PTS), REFERENTE AO EMPREENDIMENTO HABITACIONAL');
+  fora('PRESTAÇÃO DE SERVIÇOS TÉCNICOS DE ARQUITETURA, ENGENHARIA CIVIL E AGRONOMIA, EM CARÁTER TEMPORÁRIO, QUANDO HOUVER INTERESSE', { valorGlobal: 0.01 });
+  fora('ELABORAÇÃO DA REVISÃO E ATUALIZAÇÃO DOS PROJETOS EXECUTIVOS DE TERRAPLENAGEM, PAVIMENTAÇÃO E DRENAGEM DA OBRA DE CONSTRUÇÃO DA NOVA SEDE, SERVIÇOS DE ENGENHARIA E/OU ARQUITETURA');
+});
+
+// ---------------------------------------------------------------- documentos e termo de referência
+const { escolherContrato, escolherTR, lerTR } = require('../parsers/lib/documentos');
+const arq = (id, nome, titulo) => ({ tipoDocumentoId: id, tipoDocumentoNome: nome, titulo, url: `https://pncp.gov.br/pncp-api/v1/x/${id}-${titulo}`, statusAtivo: true });
+
+test('Documentos: o termo de referência na ordem de preferência', () => {
+  assert.equal(escolherTR([arq(20, 'Ato que autoriza a Contratação Direta', 'Autorizacao.pdf'), arq(7, 'Estudo Técnico Preliminar', 'ETP.pdf'), arq(4, 'Termo de Referência', 'TR_assinado.pdf')]).titulo, 'TR_assinado.pdf');
+  assert.equal(escolherTR([arq(1, 'Aviso de Contratação Direta', 'TDL, TR E ANEXOS.pdf'), arq(20, 'Ato', 'AUTORIZACAO DG.pdf')]).titulo, 'TDL, TR E ANEXOS.pdf');
+  assert.equal(escolherTR([arq(2, 'Edital', 'Anexo-VI---Detalhamento-do-BDI'), arq(6, 'Projeto Básico', 'Projeto básico')]).titulo, 'Projeto básico');
+  assert.equal(escolherTR([arq(16, 'Outros Documentos', 'EXTRATO')]), null);
+  assert.equal(escolherContrato([arq(12, 'Contrato', 'ContratoLote3assi.pdf')]).titulo, 'ContratoLote3assi.pdf');
+});
+
+test('Termo de referência: área, fases, disciplinas e prazo', () => {
+  const r = lerTR(`TERMO DE REFERÊNCIA. 1. OBJETO: elaboração do projeto executivo de restauração das fachadas do prédio sede, com área construída de 1.245,30 m², incluindo levantamento cadastral, estudo preliminar, anteprojeto e projeto executivo de arquitetura, instalações elétricas e SPDA, com planilha orçamentária. Custo de referência de R$ 2.300,00 m² de obra. O terreno tem 3.400 m2. Entrega em BIM. 6. PRAZO DE EXECUÇÃO: o prazo de execução dos serviços será de 120 (cento e vinte) dias. ${'texto '.repeat(40)}`);
+  assert.equal(r.area_m2, 1245.3);
+  assert.deepEqual(r.areas.map(a => a.m2), [1245.3, 3400], 'o preço por m² não é área');
+  assert.deepEqual(r.fases, ['levantamento', 'estudo_preliminar', 'anteprojeto', 'projeto_executivo']);
+  assert.ok(r.disciplinas.includes('arquitetura') && r.disciplinas.includes('eletrica') && r.disciplinas.includes('orcamento'));
+  assert.equal(r.bim, true);
+  assert.deepEqual([r.prazo.valor, r.prazo.unidade], [120, 'dias']);
+  assert.deepEqual(lerTR('   '), { legivel: false });
+});
+
+test('Concursos: como o vencedor será contratado (valor do contrato do projeto)', () => {
+  const { extrairSite, juntar, palpites } = require('../js/extrair-site.js');
+  const html = '<p>1º lugar: R$ 80.000,00 (+ Contrato Projeto Executivo – Arquitetura, Urbanismo, Paisagismo e Complementares: R$ 7.241.792,03)</p><p>O autor da proposta vencedora será contratado para o desenvolvimento das etapas posteriores do projeto.</p><p>A área construída será ampliada dos atuais 4.198 m² para cerca de 5.600 m².</p>';
+  const r = juntar([extrairSite(html, 'https://exemplo.org/concurso')]);
+  assert.equal(r.contratacao.length, 2);
+  assert.equal(r.areas.length, 1);
+  assert.match(palpites(r).contratacao, /7\.241\.792,03/);
 });

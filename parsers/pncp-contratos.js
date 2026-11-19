@@ -1,4 +1,8 @@
-// Parser: PNCP — contratos de obra assinados (aba Licitações › Contratadas). Ver LICITACOES.md.
+// Parser: PNCP — contratos assinados (aba Licitações › Contratadas). Ver LICITACOES.md.
+//
+// Dois tipos saem daqui: contratos de obra em PB/PE/RN (a construtora vencedora é a pista) e, do
+// Brasil inteiro, contratos só de projeto (o preço pago por um projeto, para o mapa de preços do
+// Universo; ficam ocultos por padrão no painel).
 //
 // GET /v1/contratos (contratos publicados num intervalo de datas). A API não filtra por UF nem por
 // categoria: lê o país inteiro no intervalo (~4.500 contratos por dia, 10 páginas de 500, sondagem
@@ -70,12 +74,14 @@ async function parse() {
   // Contato público de cada construtora (uma consulta por CNPJ)
   const contatos = new Map();
   for (const item of porId.values()) {
+    if (item.tipo_objeto === 'projeto') continue; // escritório de projeto: concorrente, não pista
     const cnpj = item.vencedor.cnpj;
     if (!contatos.has(cnpj)) { contatos.set(cnpj, await contatoPorCnpj(cnpj)); await dormir(400); }
     item.vencedor = { ...item.vencedor, ...(contatos.get(cnpj) || {}) };
   }
 
-  console.log(`[${FONTE}] ${DIAS} dia(s): ${lidos} contratos lidos, ${porId.size} obras de interesse em PB/PE/RN`);
+  const projetos = [...porId.values()].filter(i => i.tipo_objeto === 'projeto').length;
+  console.log(`[${FONTE}] ${DIAS} dia(s): ${lidos} contratos lidos, ${porId.size - projetos} obras de interesse em PB/PE/RN, ${projetos} contratos só de projeto no Brasil`);
   return [...porId.values()];
 }
 
@@ -84,7 +90,7 @@ module.exports = { parse, FONTE };
 if (require.main === module) {
   parse()
     .then(r => {
-      for (const c of r) console.log(`- N${c.nivel} ${c.uf} ${c.municipio} · ${c.tipo_objeto} · R$ ${(c.valor_global / 100).toLocaleString('pt-BR')} · ${c.vencedor.nome} (${(c.vencedor.telefones || []).join(', ')} ${c.vencedor.email || ''}) · ${c.objeto?.slice(0, 140)}`);
+      for (const c of r) console.log(`- ${c.tipo_objeto === 'projeto' ? 'PROJETO' : `N${c.nivel}`} ${c.uf} ${c.municipio} · ${c.tipo_objeto} · R$ ${(c.valor_global / 100).toLocaleString('pt-BR')} · ${c.vencedor.nome} (${(c.vencedor.telefones || []).join(', ')} ${c.vencedor.email || ''}) · ${c.objeto?.slice(0, 140)}`);
     })
     .catch(err => { console.error('Erro ao coletar contratos do PNCP:', err.message); process.exit(1); });
 }

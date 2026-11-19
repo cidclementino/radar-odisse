@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       dias:
-        description: 'Contratos assinados: quantos dias para trás ler (padrão 3; até 120 na primeira vez)'
+        description: 'Contratos assinados (obras e só projeto): quantos dias para trás ler (padrão 3; até 120; no passado longo, subir de 30 em 30 dias por dia por causa das gravações do KV)'
         required: false
         default: '3'
 

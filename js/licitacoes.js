@@ -5,6 +5,8 @@
 //     pelo prazo, clique abre o detalhe).
 //   - Contratadas: contratos de obra assinados; a pista é a construtora vencedora, que vai precisar de
 //     arquitetura. Cartão no desenho de Terrenos (borda pelo nível 1–3), com o contato da vencedora.
+//     Os contratos só de projeto (Brasil inteiro) também estão aqui, mas ocultos por padrão: servem ao
+//     mapa de preços do Universo, não ao Radar. Aparecem com o filtro "Só projeto (mapa de preços)".
 // Dados do Worker com cache no navegador (carregarComCache, em comum.js): a página abre na hora com a
 // última cópia e atualiza por baixo.
 
@@ -26,6 +28,7 @@ let vistaAtual = () => 'cartoes';
 let fase = prefLer('licitacoes:fase', 'abertas');
 
 const ehContratada = l => l.fase === 'contratada';
+const ehProjetoContratado = l => ehContratada(l) && l.tipo_objeto === 'projeto';
 const daFase = l => ehContratada(l) === (fase === 'contratadas');
 
 // ---------------------------------------------------------------- regras
@@ -115,9 +118,11 @@ function passa(l) {
     if (filtros.prazo === '45' && (d <= 15 || d > 45)) return false;
     if (filtros.prazo === 'mais' && d <= 45) return false;
   }
-  if (fase === 'contratadas' && filtros.nivel) {
+  if (fase === 'contratadas' && filtros.nivel && filtros.tipo !== 'projeto') {
     if (filtros.nivel === '2+' ? (l.nivel || 0) < 2 : String(l.nivel) !== filtros.nivel) return false;
   }
+  // Contratos só de projeto: só com o filtro próprio (são do mapa de preços, não pistas).
+  if (fase === 'contratadas' && !filtros.tipo && ehProjetoContratado(l)) return false;
   if (filtros.tipo && l.tipo_objeto !== filtros.tipo) return false;
   if (filtros.escopo && !(l.escopo || []).includes(filtros.escopo)) return false;
   if (filtros.uf && l.uf !== filtros.uf) return false;
@@ -134,10 +139,10 @@ function prepararControles() {
   const tipo = document.getElementById('f-tipo');
   tipo.innerHTML = fase === 'abertas'
     ? '<option value="">Projeto ou projeto e obra</option><option value="projeto">Só projeto</option><option value="projeto_e_obra">Projeto e obra</option>'
-    : '<option value="">Obra ou projeto e obra</option><option value="projeto_e_obra">Projeto e obra</option><option value="obra">Só obra</option>';
+    : '<option value="">Obra ou projeto e obra</option><option value="projeto_e_obra">Projeto e obra</option><option value="obra">Só obra</option><option value="projeto">Só projeto (mapa de preços)</option>';
   document.getElementById('f-prazo').hidden = fase !== 'abertas';
   document.getElementById('f-modalidade').hidden = fase !== 'abertas';
-  document.getElementById('f-nivel').hidden = fase !== 'contratadas';
+  document.getElementById('f-nivel').hidden = fase !== 'contratadas' || filtros.tipo === 'projeto';
   document.getElementById('f-busca').placeholder = fase === 'abertas' ? 'Buscar no objeto, órgão ou município' : 'Buscar no objeto, órgão, município ou construtora';
   document.getElementById('intro-abertas').hidden = fase !== 'abertas';
   document.getElementById('intro-contratadas').hidden = fase !== 'contratadas';
@@ -149,6 +154,7 @@ function ligarFiltros() {
     const el = document.getElementById(id);
     el.addEventListener(k === 'busca' ? 'input' : 'change', () => {
       filtros[k] = el.value;
+      if (k === 'tipo') document.getElementById('f-nivel').hidden = fase !== 'contratadas' || filtros.tipo === 'projeto';
       const { busca, ...lembrar } = filtros;
       prefGravar(`licitacoes:filtros:${fase}`, lembrar);
       render();
@@ -185,7 +191,7 @@ function ligarFases() {
 }
 
 function atualizarContagemFases() {
-  const n = f => licitacoes.filter(l => ehContratada(l) === (f === 'contratadas') && l.status_interno !== 'descartado' && !(f === 'abertas' && encerrada(l))).length;
+  const n = f => licitacoes.filter(l => ehContratada(l) === (f === 'contratadas') && !ehProjetoContratado(l) && l.status_interno !== 'descartado' && !(f === 'abertas' && encerrada(l))).length;
   for (const f of ['abertas', 'contratadas']) {
     const el = document.getElementById(`contador-${f}`);
     const v = n(f);
@@ -222,6 +228,14 @@ function seletorSituacao(l) {
     .map(([v, r]) => `<option value="${v}"${(l.status_interno || 'monitorando') === v ? ' selected' : ''}>${r}</option>`).join('')}</select>`;
 }
 
+/** Links do PNCP para consulta rápida: contrato assinado, termo de referência, edital. */
+function linksDocumentos(l) {
+  const d = l.documentos || {};
+  const a = (doc, rotulo) => (doc?.url ? `<a class="detalhe__link" href="${escapeHTML(doc.url)}" target="_blank" rel="noopener" title="${escapeHTML(doc.titulo || '')}">${rotulo} ↗</a>` : '');
+  const trRotulo = !d.tr ? '' : /termo de refer/i.test(d.tr.tipo || d.tr.titulo || '') ? 'Termo de referência' : `Termo de referência (${(d.tr.tipo || 'documento').toLowerCase()})`;
+  return [a(d.contrato, 'Contrato'), d.tr ? a(d.tr, trRotulo) : '', a(d.edital, 'Edital')].filter(Boolean).join('');
+}
+
 const tagsEscopo = l => (l.escopo || []).map(e => `<span class="u-etiqueta suave">${escapeHTML(ESCOPO_LABELS[e] || e)}</span>`).join('');
 const obsCampo = l => `<label class="u-campo licitacao__obs"><span>Observações</span><textarea class="js-obs" rows="2" maxlength="4000">${escapeHTML(l.observacoes || '')}</textarea></label>`;
 
@@ -249,6 +263,7 @@ function detalheAberta(l) {
       <div class="licitacao__links">
         ${l.link_pncp ? `<a class="detalhe__link" href="${escapeHTML(l.link_pncp)}" target="_blank" rel="noopener">Edital no PNCP ↗</a>` : ''}
         ${l.link_sistema ? `<a class="detalhe__link" href="${escapeHTML(l.link_sistema)}" target="_blank" rel="noopener">Sistema de propostas ↗</a>` : ''}
+        ${linksDocumentos(l)}
       </div>
     </div>`;
 }
@@ -292,6 +307,7 @@ function ligarAbrir(el) {
 // ---------------------------------------------------------------- contratadas: cartão
 
 function renderCartaoContratada(l) {
+  if (ehProjetoContratado(l)) return renderCartaoProjeto(l);
   const v = l.vencedor || {};
   const el = document.createElement('article');
   el.className = `oportunidade contratada oportunidade--nivel-${l.nivel}${l.status_interno === 'descartado' ? ' is-apagado' : ''}`;
@@ -309,11 +325,84 @@ function renderCartaoContratada(l) {
       <p class="u-apoio">${escapeHTML([v.nome_fantasia && v.nome_fantasia !== v.nome ? v.nome_fantasia : null, `CNPJ ${cnpjFormatado(v.cnpj)}`, v.cidade || null].filter(Boolean).join(' · '))}</p>
       ${contatos.length ? `<div class="corretor__contatos">${contatos.join('')}</div>` : '<p class="u-apoio">Sem contato público na Receita.</p>'}
     </div>
+    ${linksDocumentos(l) ? `<div class="licitacao__links">${linksDocumentos(l)}</div>` : ''}
     <details class="contratada__mais"><summary>Observações</summary>${obsCampo(l)}</details>
     <div class="oportunidade__rodape">
       <span>${escapeHTML([dinheiro(l.valor_global), l.assinatura ? `assinado ${formatarData(l.assinatura)}` : null].filter(Boolean).join(' · '))}</span>
       ${seletorSituacao(l)}
     </div>`;
+  ligarItem(el, l);
+  return el;
+}
+
+// ---------------------------------------------------------------- contratadas só de projeto (mapa de preços)
+
+const FASE_LABELS = { levantamento: 'Levantamento', estudo_preliminar: 'Estudo preliminar', anteprojeto: 'Anteprojeto', projeto_legal: 'Projeto legal', projeto_basico: 'Projeto básico', projeto_executivo: 'Projeto executivo', detalhamento: 'Detalhamento', as_built: 'As built', assistencia_obra: 'Assistência à obra' };
+const DISCIPLINA_LABELS = { arquitetura: 'Arquitetura', interiores: 'Interiores', paisagismo: 'Paisagismo', urbanismo: 'Urbanismo', restauro: 'Restauro', estrutura: 'Estrutura', eletrica: 'Elétrica', hidrossanitario: 'Hidrossanitário', incendio: 'Incêndio', climatizacao: 'Climatização', dados_e_voz: 'Dados e voz', spda: 'SPDA', orcamento: 'Orçamento', acessibilidade: 'Acessibilidade' };
+const m2 = n => `${Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m²`;
+const porM2 = l => (l.tr?.area_m2 && l.valor_global ? Math.round(l.valor_global / l.tr.area_m2) : null);
+
+/** O que o termo de referência diz (palpite: os trechos estão no detalhe, para conferir no documento). */
+function resumoTR(l) {
+  const tr = l.tr;
+  if (!tr) return l.documentos?.tr ? '<p class="u-apoio">Termo de referência ainda não lido.</p>' : '<p class="u-apoio">Sem termo de referência publicado no PNCP.</p>';
+  if (tr.legivel === false) return `<p class="u-apoio">Termo de referência não lido${tr.erro ? `: ${escapeHTML(tr.erro)}` : ' (sem texto: escaneado?)'}.</p>`;
+  return `<div class="detalhe__grade">
+    ${campo('Área (palpite do TR)', tr.area_m2 ? m2(tr.area_m2) : 'Não achada')}
+    ${campo('Preço por m²', porM2(l) ? `${dinheiro(porM2(l))}/m²` : null)}
+    ${campo('Fases citadas', (tr.fases || []).map(f => FASE_LABELS[f] || f).join(', '))}
+    ${campo('Disciplinas citadas', (tr.disciplinas || []).map(d => DISCIPLINA_LABELS[d] || d).join(', '))}
+    ${campo('BIM', tr.bim ? 'Sim' : null)}
+    ${campo('Prazo', tr.prazo ? `${tr.prazo.valor} ${tr.prazo.unidade}` : null)}
+  </div>`;
+}
+
+/** Trechos do TR (o registro inteiro, buscado ao abrir). */
+async function carregarTrechos(el, l) {
+  const alvo = el.querySelector('.js-trechos');
+  if (!alvo || alvo.dataset.carregado) return;
+  alvo.dataset.carregado = '1';
+  alvo.innerHTML = '<p class="u-apoio">Carregando os trechos…</p>';
+  try {
+    const res = await fetch(`${WORKER}/api/licitacoes/${encodeURIComponent(l.id)}`);
+    const r = await res.json();
+    if (!res.ok) throw new Error(r.error || res.status);
+    const areas = r.tr?.areas || [];
+    alvo.innerHTML = [
+      ...areas.map(a => `<p class="licitacao__trecho"><strong>${escapeHTML(m2(a.m2))}${a.do_objeto ? '' : ' (?)'}</strong> — “${escapeHTML(a.trecho)}”</p>`),
+      r.tr?.prazo?.trecho ? `<p class="licitacao__trecho"><strong>Prazo</strong> — “${escapeHTML(r.tr.prazo.trecho)}”</p>` : '',
+      r.tr?.documento ? `<p class="u-apoio">Lido de: ${escapeHTML(r.tr.documento)}</p>` : '',
+    ].join('') || '<p class="u-apoio">Nenhum trecho com área ou prazo.</p>';
+  } catch (err) {
+    alvo.innerHTML = `<p class="u-apoio">Não deu para carregar: ${escapeHTML(err.message)}</p>`;
+  }
+}
+
+function renderCartaoProjeto(l) {
+  const v = l.vencedor || {};
+  const el = document.createElement('article');
+  el.className = `oportunidade contratada contratada--projeto${l.status_interno === 'descartado' ? ' is-apagado' : ''}`;
+  el.innerHTML = `
+    <div class="oportunidade__tags">
+      <span class="u-etiqueta selo-novo">Só projeto · mapa de preços</span>
+      ${tagsEscopo(l)}
+    </div>
+    <h3 class="oportunidade__titulo licitacao__objeto">${l.link_pncp ? `<a href="${escapeHTML(l.link_pncp)}" target="_blank" rel="noopener">${escapeHTML(legivel(l.objeto))}</a>` : escapeHTML(legivel(l.objeto))}</h3>
+    <p class="oportunidade__local">${escapeHTML([l.orgao, localDe(l), ESFERA[l.esfera]].filter(Boolean).join(' · '))}</p>
+    <div class="contratada__vencedora">
+      <span class="u-rotulo">Contratada</span>
+      <p class="corretor__nome">${escapeHTML(v.nome || '—')}</p>
+      <p class="u-apoio">${escapeHTML(v.pessoa === 'fisica' ? 'Pessoa física' : v.cnpj ? `CNPJ ${cnpjFormatado(v.cnpj)}` : '')}</p>
+    </div>
+    ${resumoTR(l)}
+    ${linksDocumentos(l) ? `<div class="licitacao__links">${linksDocumentos(l)}</div>` : ''}
+    ${l.tr?.legivel ? '<details class="contratada__mais js-abrir-trechos"><summary>Trechos do termo de referência</summary><div class="js-trechos"></div></details>' : ''}
+    <details class="contratada__mais"><summary>Observações</summary>${obsCampo(l)}</details>
+    <div class="oportunidade__rodape">
+      <span>${escapeHTML([dinheiro(l.valor_global), l.assinatura ? `assinado ${formatarData(l.assinatura)}` : null].filter(Boolean).join(' · '))}</span>
+      ${seletorSituacao(l)}
+    </div>`;
+  el.querySelector('.js-abrir-trechos')?.addEventListener('toggle', e => { if (e.target.open) carregarTrechos(el, l); });
   ligarItem(el, l);
   return el;
 }
@@ -341,6 +430,17 @@ const COLUNAS = {
     { id: 'situacao', rotulo: 'Situação', classe: 'col-media', ordena: false },
   ],
 };
+// Só projeto (mapa de preços): sem nível nem contato; o valor leva a área e o preço por m².
+COLUNAS.precos = [
+  { id: 'objeto', rotulo: 'Projeto contratado' },
+  { id: 'vencedora', rotulo: 'Contratada' },
+  { id: 'documentos', rotulo: 'Documentos', classe: 'col-larga', ordena: false },
+  { id: 'local', rotulo: 'Local', classe: 'col-media' },
+  { id: 'valor', rotulo: 'Valor', classe: 'col-num col-larga' },
+  { id: 'porm2', rotulo: 'R$/m²', classe: 'col-num' },
+  { id: 'assinatura', rotulo: 'Assinado', classe: 'col-num col-larga' },
+  { id: 'situacao', rotulo: 'Situação', classe: 'col-media', ordena: false },
+];
 const ordens = {
   abertas: prefLer('licitacoes:ordem', { coluna: 'prazo', direcao: 'asc' }),
   contratadas: prefLer('licitacoes:ordem:contratadas', { coluna: 'nivel', direcao: 'desc' }),
@@ -355,6 +455,7 @@ const VALOR = {
   modalidade: l => l.modalidade || null,
   valor: l => valorDe(l),
   assinatura: l => l.assinatura || null,
+  porm2: l => porM2(l),
 };
 
 function renderLista(itens) {
@@ -363,7 +464,8 @@ function renderLista(itens) {
   const f = VALOR[ordem.coluna] || VALOR.objeto;
   const desempate = fase === 'abertas' ? (a, b) => comparar(VALOR.prazo(a), VALOR.prazo(b), 'asc') : (a, b) => comparar(VALOR.assinatura(a), VALOR.assinatura(b), 'desc');
   const ordenados = [...itens].sort((a, b) => comparar(f(a), f(b), ordem.direcao) || desempate(a, b));
-  lista.innerHTML = `<div class="tabela-rolagem"><table class="u-tabela tabela">${theadOrdenavel(COLUNAS[fase], ordem)}<tbody></tbody></table></div>`;
+  const colunas = fase === 'contratadas' && filtros.tipo === 'projeto' ? COLUNAS.precos : COLUNAS[fase];
+  lista.innerHTML = `<div class="tabela-rolagem"><table class="u-tabela tabela">${theadOrdenavel(colunas, ordem)}<tbody></tbody></table></div>`;
   const corpo = lista.querySelector('tbody');
   for (const l of ordenados) {
     const tr = document.createElement('tr');
@@ -379,6 +481,17 @@ function renderLista(itens) {
         <td class="col-media">${escapeHTML(TIPO_LABELS[l.tipo_objeto] || '')}</td>
         <td class="col-larga">${escapeHTML(l.modalidade || '')}</td>
         <td class="col-num col-larga">${escapeHTML(dinheiro(l.valor_estimado) || '')}</td>
+        <td class="col-media">${seletorSituacao(l)}</td>`;
+    } else if (ehProjetoContratado(l)) {
+      tr.className = `linha${l.status_interno === 'descartado' ? ' is-apagado' : ''}`;
+      tr.innerHTML = `
+        <td>${objeto}<div class="u-apoio">${escapeHTML(l.orgao || '')}</div></td>
+        <td>${escapeHTML(l.vencedor?.nome || '')}</td>
+        <td class="col-larga"><div class="licitacao__links">${linksDocumentos(l)}</div></td>
+        <td class="col-media">${escapeHTML(localDe(l))}</td>
+        <td class="col-num col-larga">${escapeHTML(dinheiro(l.valor_global) || '')}${l.tr?.area_m2 ? `<div class="u-apoio">${escapeHTML(m2(l.tr.area_m2))}</div>` : ''}</td>
+        <td class="col-num">${porM2(l) ? escapeHTML(dinheiro(porM2(l))) : ''}</td>
+        <td class="col-num col-larga">${formatarData(l.assinatura)}</td>
         <td class="col-media">${seletorSituacao(l)}</td>`;
     } else {
       tr.className = `linha linha--nivel-${l.nivel}${l.status_interno === 'descartado' ? ' is-apagado' : ''}`;
@@ -451,7 +564,7 @@ function render() {
   if (vista === 'cartoes') {
     const ordenados = fase === 'abertas'
       ? [...visiveis].sort((a, b) => comparar(encerrada(a) ? null : diasDe(a), encerrada(b) ? null : diasDe(b), 'asc'))
-      : [...visiveis].sort((a, b) => (b.nivel - a.nivel) || comparar(a.assinatura, b.assinatura, 'desc'));
+      : [...visiveis].sort((a, b) => ((b.nivel || 0) - (a.nivel || 0)) || comparar(a.assinatura, b.assinatura, 'desc'));
     grade.replaceChildren(...ordenados.map(fase === 'abertas' ? renderCartaoAberta : renderCartaoContratada));
     lista.innerHTML = '';
   } else {
@@ -469,6 +582,10 @@ function render() {
     const urgentes = visiveis.filter(l => { const d = diasDe(l); return d !== null && d >= 0 && d <= 15; }).length;
     if (soProjeto) partes.push(`${soProjeto} só de projeto`);
     if (urgentes) partes.push(`${urgentes} fecha${urgentes === 1 ? '' : 'm'} em até 15 dias`);
+  } else if (filtros.tipo === 'projeto') {
+    partes.push(plural(visiveis.length, 'contrato só de projeto', 'contratos só de projeto'));
+    const comArea = visiveis.filter(l => l.tr?.area_m2).length;
+    if (comArea) partes.push(`${comArea} com área lida do termo de referência`);
   } else {
     partes.push(plural(visiveis.length, 'contrato de obra', 'contratos de obra'));
     const altos = visiveis.filter(l => l.nivel >= 2).length;

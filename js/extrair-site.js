@@ -2,7 +2,8 @@
 //
 // Recebe o HTML de uma página e devolve o que dá para tirar dela: banner, descrição, datas (com o
 // tipo de prazo e o trecho onde apareceram), taxas, prêmios, júri, quem pode participar, local,
-// documentos (regulamento, edital, brief), contatos e links para outras páginas do mesmo site que
+// como o vencedor será contratado (valor do contrato do projeto), área do objeto, documentos
+// (regulamento, edital, brief), contatos e links para outras páginas do mesmo site que
 // valem a leitura (regras, prêmios, cronograma…).
 //
 // Só usa texto e expressões regulares — sem DOM — para rodar igual no navegador (página de
@@ -152,6 +153,13 @@
     return out;
   }
 
+  // Como o vencedor será contratado para desenvolver o projeto (é lá que está o preço do projeto, não
+  // no prêmio): "contrato para desenvolvimento dos projetos: R$ …", "será contratado para as etapas
+  // posteriores", "Contrato Projeto Executivo: R$ …".
+  const RE_CONTRATACAO = /contrat(o|a[çc][ãa]o)\s+(para|do|da|de|dos|das)\s+(o\s+|a\s+|os\s+)?(desenvolvimento|elabora[çc][ãa]o|projetos?)|contrato\s+(de\s+)?projeto|ser[áa]\s+contratad[oa]|ser[ãa]o\s+contratad[oa]s|etapas\s+posteriores|desenvolvimento\s+d[oa]s?\s+(projetos?|etapas)|honor[áa]rios|licita[çc][ãa]o\s+pr[óo]pria|commission(ed)?\s+to\s+(develop|design)|design\s+contract|contract\s+(for|to)\s+(the\s+)?(develop|design|detail)/i;
+  // Área do objeto: "4.198 m²", "cerca de 5.600 m2", "12 hectares" (sem preço por m²).
+  const RE_AREA = /\d[\d.,]*\s?(m²|m2\b|metros\s+quadrados|hectares?\b|\bha\b|sq\.?\s?m\b|square\s+met)/i;
+
   const RE_DOC = /\b(brief|rules|regulations?|terms|guidelines|competition\s+pack|programme|program|regulamento|edital|termo\s+de\s+refer|bases|anexo|kit)\b/i;
   const RE_PAGINA_UTIL = /\b(rules|regulations?|brief|faq|prizes?|awards?|jury|judges|timeline|schedule|calendar|dates|deadlines?|how[\s-]to|register|registration|participate|entry|submission|fees?|regulamento|edital|cronograma|premia[çc][ãa]o|j[úu]ri|inscri[çc][õo]es|como\s+participar)\b/i;
 
@@ -200,6 +208,8 @@
       imagem: imagemBruta ? absoluto(imagemBruta, url) : null,
       datas: acharDatas(linhas),
       taxas: linhasCom(linhas, RE_DINHEIRO, { filtro: l => /fee|regist|entry|inscri|taxa|price|cost|pay|early|late|standard/i.test(l) && !/prize|winner|award(ed)?\s+(of|with)|1st|first\s+place|prêmio|premia/i.test(l) }),
+      contratacao: linhasCom(linhas, RE_CONTRATACAO, { max: 6 }),
+      areas: linhasCom(linhas, RE_AREA, { max: 4, filtro: l => !/(R\$|US\$|€|\$)\s?\d[\d.,]*\s?\/\s?m/i.test(l) }),
       premios: linhasCom(linhas, /prize|winner|1st|2nd|3rd|first\s+place|honou?rable|mention|award(ed)?\s+(of|with)|pr[êe]mio|premia|vencedor|men[çc][ãa]o/i, { filtro: l => RE_DINHEIRO.test(l) || /honou?rable|mention|men[çc][ãa]o|publication|publica|exhibit|exposi/i.test(l) }),
       juri: linhasCom(linhas, /\bjury\b|juror|judges?\b|j[úu]ri|jurados|comiss[ãa]o\s+julgadora|banca/i, { max: 5 }),
       participantes: linhasCom(linhas, /open\s+to|eligib|who\s+can|participants?\s+(must|can|may)|teams?\s+of|requirements|podem\s+participar|participa[çc][ãa]o\s+(é|aberta)|estudantes|profissionais/i, { max: 5 }),
@@ -220,7 +230,7 @@
     for (const o of outras) {
       r.imagem = r.imagem || o.imagem;
       r.descricao = r.descricao || o.descricao;
-      for (const k of ['taxas', 'premios', 'juri', 'participantes', 'local', 'idioma', 'emails']) r[k] = uniq([...(r[k] || []), ...(o[k] || [])]).slice(0, 8);
+      for (const k of ['taxas', 'premios', 'contratacao', 'areas', 'juri', 'participantes', 'local', 'idioma', 'emails']) r[k] = uniq([...(r[k] || []), ...(o[k] || [])]).slice(0, 8);
       r.documentos = uniq([...(r.documentos || []), ...(o.documentos || [])], d => d.url).slice(0, 12);
       r.datas = uniq([...(r.datas || []), ...(o.datas || [])], d => d.tipo + d.data).sort((a, b) => a.data.localeCompare(b.data)).slice(0, 40);
     }
@@ -237,7 +247,9 @@
     let entrega = ultima('entrega');
     // "Deadline: ..." sem dizer de quê costuma ser a entrega
     if (!entrega && !inscricao) entrega = ultima('prazo');
-    return { imagem_url: r.imagem || null, inscricao_fim: inscricao, entrega_fim: entrega, resultado_previsto: ultima('resultado') };
+    // Contratação do vencedor: de preferência a linha que diz o valor do contrato.
+    const contratacao = (r.contratacao || []).find(l => /contrat/i.test(l) && RE_DINHEIRO.test(l)) || (r.contratacao || [])[0] || null;
+    return { imagem_url: r.imagem || null, inscricao_fim: inscricao, entrega_fim: entrega, resultado_previsto: ultima('resultado'), contratacao };
   }
 
   return { extrairSite, juntar, palpites, textoDe };

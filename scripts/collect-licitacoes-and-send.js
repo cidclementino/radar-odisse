@@ -6,6 +6,7 @@
 // (a construtora vencedora como pista). Uma falhar não impede a outra.
 const pncp = require('../parsers/pncp');
 const contratos = require('../parsers/pncp-contratos');
+const { completarDocumentos } = require('../parsers/pncp-documentos');
 
 async function main() {
   const { WORKER_URL, COLLECT_SECRET } = process.env;
@@ -25,6 +26,17 @@ async function main() {
     }
   }
   if (!licitacoes.length) console.log('Nada novo nesta rodada.');
+
+  // Links do contrato e do termo de referência (e, nos contratos só de projeto, a leitura do TR):
+  // só para o que ainda não tem documentos no Radar.
+  try {
+    const res = await fetch(`${WORKER_URL}/api/licitacoes`, { headers: { Authorization: `Bearer ${COLLECT_SECRET}` } });
+    const guardadas = res.ok ? await res.json() : [];
+    const prontos = new Set(guardadas.filter(l => l.documentos).map(l => l.id));
+    await completarDocumentos(licitacoes, prontos);
+  } catch (err) {
+    console.error('Documentos falharam (a coleta segue sem eles):', err.message);
+  }
 
   // Lotes de 50: o Worker faz até ~5 operações de KV por item e o plano gratuito aceita 1.000 por pedido.
   const LOTE = 50;

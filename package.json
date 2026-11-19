@@ -21,7 +21,8 @@
   "license": "UNLICENSED",
   "dependencies": {
     "cheerio": "^1.2.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "unpdf": "^2.2.1"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"

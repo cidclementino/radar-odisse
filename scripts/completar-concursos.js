@@ -79,7 +79,7 @@ async function main() {
     // sem site oficial, a própria publicação na fonte (ex.: notícia do IAB) costuma ter os prazos
     const { site, erro } = await lerSite(c.link_oficial || c.fonte_url_original);
     const p = palpites(site);
-    const item = { id: c.id, campos: { imagem_url: p.imagem_url, inscricao_fim: p.inscricao_fim, entrega_fim: p.entrega_fim, resultado_previsto: p.resultado_previsto } };
+    const item = { id: c.id, campos: { imagem_url: p.imagem_url, inscricao_fim: p.inscricao_fim, entrega_fim: p.entrega_fim, resultado_previsto: p.resultado_previsto, contratacao: p.contratacao } };
     if (acompanhados.includes(c)) item.acompanhamento = { ...(c.acompanhamento || {}), site, erro, lido_em: new Date().toISOString() };
     itens.push(item);
     const achou = Object.entries(item.campos).filter(([, v]) => v).map(([k]) => k).join(', ');

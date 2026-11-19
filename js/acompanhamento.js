@@ -112,6 +112,8 @@ function renderCartao(c) {
       <div class="acomp__grade">
         ${renderDatas(c, site)}
         ${secao('Inscrição e taxas', site?.taxas)}
+        ${secao('Contratação do vencedor', site?.contratacao)}
+        ${secao('Área', site?.areas)}
         ${secao('Prêmios', site?.premios)}
         ${secao('Quem pode participar', site?.participantes)}
         ${secao('Júri', site?.juri)}

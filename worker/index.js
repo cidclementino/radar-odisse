@@ -23,6 +23,7 @@
 //   GET    /api/corretores         -> lista todos os Corretores (Terrenos)
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
 //   GET    /api/licitacoes         -> lista as Licitações (PNCP)
+//   GET    /api/licitacoes/:id     -> o registro inteiro de uma Licitação (com os trechos do termo de referência)
 //   PATCH  /api/licitacoes/:id     -> situação e observações de uma Licitação
 //   POST   /api/collect-licitacoes -> recebe { licitacoes } da coleta do PNCP, em lotes de até 50 (segredo da coleta)
 //   POST   /api/manutencao/limpar-licitacoes -> apaga encerradas antigas e contratadas velhas ou descartadas (idem)
@@ -51,7 +52,7 @@ import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
-import { coletarLicitacoes, patchLicitacao, limparLicitacoes } from './licitacoes.js';
+import { coletarLicitacoes, patchLicitacao, limparLicitacoes, lerLicitacao } from './licitacoes.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -234,7 +235,8 @@ function aplicarCompletar(alvo, campos) {
   const vazio = v => v === null || v === undefined || v === '';
   const texto = v => (typeof v === 'string' && v.trim() && v.length < 2000 ? v.trim() : null);
   if (vazio(alvo.imagem_url) && texto(campos.imagem_url) && /^https?:\/\//.test(campos.imagem_url)) alvo.imagem_url = campos.imagem_url.trim();
-  for (const k of ['local_projeto', 'promotor', 'premio', 'descricao']) {
+  // contratacao: como o vencedor será contratado (valor do contrato do projeto), tirado do site oficial
+  for (const k of ['local_projeto', 'promotor', 'premio', 'descricao', 'contratacao']) {
     if (vazio(alvo[k]) && texto(campos[k])) alvo[k] = texto(campos[k]);
   }
   alvo.datas = { ...(alvo.datas || {}) };
@@ -578,10 +580,13 @@ const COPIA_VALIDADE_MS = 60 * 60 * 1000;
 // A cópia da lista leva só o que as páginas mostram. Licitações (PNCP): o texto complementar sai
 // das contratadas e encurta nas abertas — a cópia é lida e interpretada a cada página aberta, e o
 // plano gratuito dá 10 ms de processamento por pedido. O registro completo continua na chave dele.
+// Na leitura do termo de referência, a lista leva só os valores (sem os trechos), que o detalhe
+// busca no registro inteiro (GET /api/licitacoes/:id).
 function enxugar(item) {
-  if (!item || item.fonte !== 'pncp.gov.br' || !item.informacao_complementar) return item;
-  const { informacao_complementar: comp, ...resto } = item;
-  if (item.fase === 'contratada') return resto;
+  if (!item || item.fonte !== 'pncp.gov.br') return item;
+  const { informacao_complementar: comp, tr, ...resto } = item;
+  if (tr) resto.tr = { legivel: tr.legivel, erro: tr.erro, area_m2: tr.area_m2, fases: tr.fases, disciplinas: tr.disciplinas, bim: tr.bim, prazo: tr.prazo ? { valor: tr.prazo.valor, unidade: tr.prazo.unidade } : null };
+  if (!comp || item.fase === 'contratada') return resto;
   return { ...resto, informacao_complementar: comp.length > 600 ? `${comp.slice(0, 600)}…` : comp };
 }
 
@@ -797,6 +802,9 @@ async function rotear(request, env, ctx) {
       return limparLicitacoes(env, json);
     }
     const matchLicitacao = url.pathname.match(/^\/api\/licitacoes\/([^/]+)$/);
+    if (request.method === 'GET' && matchLicitacao) {
+      return lerLicitacao(env, decodeURIComponent(matchLicitacao[1]), json);
+    }
     if (request.method === 'PATCH' && matchLicitacao) {
       return patchLicitacao(request, env, decodeURIComponent(matchLicitacao[1]), json);
     }

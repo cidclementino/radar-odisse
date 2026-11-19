@@ -21,8 +21,43 @@ const RE_NAO_OBRA = /(manutencao (predial|preventiva|corretiva)|locacao|aquisica
 // Instrumentos que não são a contratação em si.
 const RE_TIPO_FORA = /(aditivo|apostilamento|rescis|cessao|termo de adesao)/;
 
+// ---------------------------------------------------------------- contratos só de projeto
+// Não são pista para o Radar (quem venceu é um escritório), mas são o preço que o mercado público
+// pagou por um projeto: entram para o mapa de preços do Universo, do Brasil inteiro, e ficam ocultos
+// por padrão no painel. Ver LICITACOES.md, "Contratos só de projeto".
+//
+// Mais estrito que o filtro das abertas: o contrato tem de dizer que ELABORA o projeto (ou nomeá-lo
+// como de arquitetura, urbanismo…), sem executar obra, comprar, manter ou acompanhar obra.
+const PROJETO_VALOR_MINIMO = 1000; // credenciamento costuma vir com valor simbólico (R$ 0,01)
+const RE_ELABORA_PROJETO = /\b(elabora\w*|desenvolv\w*|revis\w*|atualiza\w*|adequa\w*)\b(\s+\S+){0,10}?\s+(projet|anteprojet|estudo preliminar|plano diretor)|\bprojet\w*\s+(arquitetonic|de arquitetura|de urbanismo|urbanistic|paisagistic|de paisagismo|de interiores|de restauro|de restauracao)|\banteprojeto\b/;
+// "execução" (não "executivo"): executar obra, reforma ou serviços; manutenção; acompanhamento de obra como objeto principal.
+const RE_FAZ_OBRA = /\bexecu(cao|tar|tada|tados?)\s+(\S+\s+){0,4}?(obras?|reforma|construcao|implantacao|servicos)|\bmanutencao\b|\bservicos de acompanhamento de obras?\b|\bengenharia administrativa\b/;
+const RE_COMPRA = /\b(aquisicao|licencas?|software|subscricao|locacao|fornecimento de (material|materiais|equipamentos?)|mobiliario planejado|marcenaria)\b/;
+const RE_OUTRO_PROJETO = /(tecnico social|\bpts\b|projeto de extensao|area degradada|\bprad\b|licenciamento ambiental|assessoria ambiental|disposicao de residuos)/;
+// Só disciplina complementar ou infraestrutura (incêndio, elétrica, terraplenagem…), sem arquitetura.
+const RE_SO_COMPLEMENTAR = /(incendio|panico|pscip|avcb|clcb|eletric|spda|hidraulic|hidrossanit|estrutura(l|is)|automacao|ventilacao|terraplen|pavimenta|drenagem|iluminacao publica|\bip\b)/;
+const RE_ARQUITETURA_NOMEADA = /(arquitetonic|projet\w*\s+(\S+\s+){0,2}?de arquitetura|de urbanismo|urbanistic|paisagistic|paisagismo|interiores|restaur|mobiliario|plano diretor)/;
+
+/** Contrato só de projeto de arquitetura/urbanismo (para o mapa de preços) — devolve a classe ou null. */
+function classificarContratoProjeto(c) {
+  if (!c || c.receita === true) return null;
+  if (RE_TIPO_FORA.test(normalizeText(c.tipoContrato?.nome))) return null;
+  const valor = Number(c.valorGlobal ?? c.valorInicial);
+  if (!(valor >= PROJETO_VALOR_MINIMO)) return null;
+  const t = normalizeText(c.objetoContrato);
+  const como = classificarObjeto(c.objetoContrato);
+  if (!como || como.tipo_objeto !== 'projeto') return null;
+  if (!RE_ELABORA_PROJETO.test(t)) return null;
+  if (RE_FAZ_OBRA.test(t) || RE_COMPRA.test(t) || RE_OUTRO_PROJETO.test(t)) return null;
+  if (RE_SO_COMPLEMENTAR.test(t) && !RE_ARQUITETURA_NOMEADA.test(t)) return null;
+  return { nivel: null, tipo_objeto: 'projeto', escopo: como.escopo.filter(e => e !== 'complementares').length ? como.escopo : ['arquitetura', ...como.escopo] };
+}
+
 function classificarContrato(c) {
   if (!c || c.receita === true) return null;
+  // Contrato só de projeto (Brasil inteiro, pessoa física ou jurídica): mapa de preços.
+  const projeto = classificarContratoProjeto(c);
+  if (projeto) return projeto;
   if (c.tipoPessoa && c.tipoPessoa !== 'PJ') return null;
   if (RE_TIPO_FORA.test(normalizeText(c.tipoContrato?.nome))) return null;
   if (!UFS.includes(c.unidadeOrgao?.ufSigla)) return null;
@@ -86,7 +121,8 @@ function paraContratada(c, agora = new Date().toISOString()) {
     unidade: texto(unidade.nomeUnidade),
     municipio: texto(unidade.municipioNome),
     uf: texto(unidade.ufSigla),
-    vencedor: { cnpj: texto(c.niFornecedor)?.replace(/\D/g, '') || null, nome: texto(c.nomeRazaoSocialFornecedor) },
+    // Pessoa física: só o nome (o CPF não é guardado no Radar).
+    vencedor: { cnpj: c.tipoPessoa === 'PF' ? null : texto(c.niFornecedor)?.replace(/\D/g, '') || null, nome: texto(c.nomeRazaoSocialFornecedor), pessoa: c.tipoPessoa === 'PF' ? 'fisica' : 'juridica' },
     valor_global: centavos(c.valorGlobal ?? c.valorInicial),
     assinatura: texto(c.dataAssinatura),
     vigencia_fim: texto(c.dataVigenciaFim),
@@ -117,4 +153,4 @@ function contatoDaReceita(r) {
   };
 }
 
-module.exports = { classificarContrato, paraContratada, contatoDaReceita, idContrato, UFS, VALOR_MINIMO };
+module.exports = { classificarContrato, classificarContratoProjeto, paraContratada, contatoDaReceita, idContrato, UFS, VALOR_MINIMO };

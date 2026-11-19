@@ -18,6 +18,8 @@ export const LOTE_MAX = 50;
 // O que é do painel ou da própria gravação: não conta para saber se o PNCP trouxe algo novo.
 const DO_PAINEL = ['status_interno', 'observacoes', 'coletado_em'];
 const NAO_COMPARA = new Set([...DO_PAINEL, 'visto_em', 'atualizado_em', 'contrato_id']);
+// Buscados uma vez só (links do contrato e do termo de referência, leitura do TR).
+const DA_PRIMEIRA_COLETA = ['documentos', 'tr'];
 
 // Contratada apagada deixa uma lápide, para a janela de 3 dias da coleta não a trazer de volta.
 // A lápide some sozinha depois do maior recuo possível da coleta (120 dias) com folga.
@@ -60,6 +62,8 @@ export async function coletarLicitacoes(request, env, json) {
     const gravar = { ...l, visto_em: agora };
     if (antiga) {
       for (const k of DO_PAINEL) if (antiga[k] !== undefined) gravar[k] = antiga[k];
+      // Documentos e leitura do TR só vêm na primeira coleta (a coleta não busca de novo): ficam.
+      for (const k of DA_PRIMEIRA_COLETA) if (l[k] === undefined && antiga[k] !== undefined) gravar[k] = antiga[k];
       if (antiga.contrato_id) gravar.contrato_id = antiga.contrato_id;
       alteradas++;
     } else novas++;
@@ -83,12 +87,20 @@ export function paraApagar(itens) {
     if (EM_CURSO.has(l.status_interno)) return false;
     if (l.fase === 'contratada') {
       if (l.status_interno === 'descartado') return true;
+      // Contrato só de projeto é dado do mapa de preços: fica, por mais velho que seja.
+      if (l.tipo_objeto === 'projeto') return false;
       const idade = diasDesde(l.assinatura || l.publicado_em);
       return idade !== null && idade > CONTRATADA_DIAS;
     }
     const encerrada = diasDesde(l.encerramento);
     return encerrada !== null && encerrada > ABERTA_ENCERRADA_DIAS;
   });
+}
+
+/** GET /api/licitacoes/:id — o registro inteiro (a lista leva uma cópia enxuta). */
+export async function lerLicitacao(env, id, json) {
+  const l = await env.LICITACOES.get(id, 'json');
+  return l ? json(l) : json({ error: 'licitação não encontrada' }, 404);
 }
 
 /** POST /api/manutencao/limpar-licitacoes — lê a cópia da lista (1 leitura) e apaga o que não serve mais. */

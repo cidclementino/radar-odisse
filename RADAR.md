@@ -46,6 +46,17 @@ oferecido pelo concurso. Raramente vem estruturado nas fontes (RSS, HTML),
 então por ora é sempre `null` nos parsers automáticos — preenchido
 manualmente na revisão quando relevante.
 
+## Contratação do vencedor (nov/2026)
+
+O prêmio não é o preço do projeto: em muitos concursos o vencedor é contratado depois para desenvolver
+as etapas seguintes, e é esse contrato que diz quanto vale o projeto (ex.: Museu da Cidade de Maringá,
+"contrato para desenvolvimento dos projetos: R$ 905.986,33"; Centro de Artes da UFC, "Contrato Projeto
+Executivo…: R$ 7.241.792,03"; Fazenda do Viegas, sem contrato, "licitação própria"). A leitura do site
+oficial (`js/extrair-site.js`) guarda as linhas sobre isso em `acompanhamento.site.contratacao` e as
+de área (m², ha) em `acompanhamento.site.areas`; a de melhor palpite (a que traz o valor do contrato)
+vai para o campo `contratacao` do concurso, preenchido só se estiver vazio. Aparece no detalhe
+("Contratação do vencedor") e na página Acompanhamento. Serve ao mapa de preços do Universo.
+
 ## Schema do `Concurso`
 
 Ver `data/concursos.sample.json` pra exemplos completos. Pontos que não são

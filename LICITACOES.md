@@ -109,6 +109,50 @@ e o Odisse se oferece como equipe de projeto dela.
 - Mesmo KV (`LICITACOES`), com `fase: 'contratada'` e id `pncpc-…`. Interface: aba "Contratadas" na
   página, com cartão no desenho de Terrenos (borda pelo nível) e a vencedora em destaque.
 
+## Contratos só de projeto: o mapa de preços (nov/2026)
+
+Até 19/11/2026 a coleta descartava o contrato só de projeto (quem vence é um escritório, concorrente).
+Ele passou a ser guardado porque é o preço que o mercado público pagou por um projeto, e o Universo
+vai montar com ele um mapa de preços para orientar as propostas do Odisse. Uma captura só: o Radar
+coleta, o mapa lê do Radar.
+
+- **Brasil inteiro**, pessoa física ou jurídica (a API não filtra por UF; a leitura já é nacional).
+  Pessoa física: só o nome (o CPF não é guardado).
+- **Filtro mais estrito que o das abertas** (`classificarContratoProjeto`, em `parsers/lib/contratos.js`,
+  testado com objetos reais da amostra de 13–18/11/2026): o contrato tem de dizer que **elabora** o
+  projeto (ou nomeá-lo como de arquitetura, urbanismo, interiores, restauro, plano diretor), e fica
+  fora se executa obra ("execução da reforma"), compra (software, licença, marcenaria), mantém,
+  acompanha obra como objeto principal, é projeto social ou ambiental, é só de disciplina complementar
+  ou infraestrutura (incêndio, elétrica, terraplenagem) sem arquitetura, ou tem valor simbólico (< R$ 1 mil,
+  típico de credenciamento). Na amostra: 66 candidatos pelo filtro antigo → 23 projetos de fato.
+- **No painel ficam ocultos**: aparecem só com o filtro "Só projeto (mapa de preços)" na aba
+  Contratadas, com cartão próprio (sem nível nem contato) e lista com R$/m². Não contam no contador.
+- **Não saem na limpeza** por idade (só se descartados): são o histórico de preços.
+- `tipo_objeto: 'projeto'`, `nivel: null`.
+
+## Documentos e termo de referência (nov/2026)
+
+Cada item coletado ganha `documentos`, para consulta rápida no painel: `contrato` (o PDF assinado, nas
+contratadas), `tr` (o termo de referência) e `edital` (nas abertas). Vêm da API de integração do PNCP
+(`/orgaos/{cnpj}/contratos|compras/{ano}/{seq}/arquivos`; `parsers/pncp-documentos.js`).
+
+- **Qual é o TR**: o arquivo do tipo "Termo de Referência"; senão um com "termo de referência" ou "TR"
+  no título; senão o projeto básico; senão o edital (o TR costuma ser anexo dele); senão o aviso de
+  contratação direta. Na amostra de 23 contratos de projeto, 6 tinham o TR em separado, 2 o projeto
+  básico e uns 8 só o edital; todos tinham o PDF do contrato.
+- **Uma vez só**: a coleta pergunta ao Worker o que já tem `documentos` e só busca o resto. O Worker
+  mantém `documentos` e `tr` quando a recoleta vem sem eles. Publicado há menos de 7 dias e ainda sem
+  nenhum arquivo: fica para a próxima coleta tentar de novo.
+- **Leitura do TR** (só nos contratos de projeto; `lerTR` em `parsers/lib/documentos.js`): PDF de até
+  25 MB lido com `unpdf`; tira a **área** (números com m² ou hectare; o melhor palpite é a que o texto
+  diz ser "área construída/total/de intervenção…"; preço por m² e medidas não contam), as **fases**
+  citadas (levantamento, estudo preliminar, anteprojeto, legal, básico, executivo, detalhamento, as built,
+  assistência à obra), as **disciplinas**, se pede **BIM** e o **prazo**. É palpite: os trechos de onde
+  saiu cada área e o prazo ficam no registro e aparecem no cartão ("Trechos do termo de referência").
+  PDF escaneado (sem texto), compactado ou do Word fica `legivel: false` com o motivo.
+- A cópia da lista leva só os valores do TR; os trechos vêm de `GET /api/licitacoes/:id` ao abrir.
+- Teste à mão de um PDF: `node parsers/pncp-documentos.js <url do arquivo no PNCP>`.
+
 ## Uso da Cloudflare (plano gratuito)
 
 Limites que pesam: 1.000 gravações de KV por dia, 100.000 leituras por dia, 1.000 operações de KV
@@ -127,8 +171,11 @@ por pedido ao Worker e 10 ms de processamento por pedido.
   dias da coleta não trazê-la de volta.
 - **Cópia da lista enxuta**: sem o texto complementar nas contratadas e com ele cortado em 600
   caracteres nas abertas. O registro completo continua na chave de cada item.
-- **Ordem de grandeza**: ~25 gravações por dia na coleta normal; ~350 no dia da carga de 60 dias
-  (não usar 120 junto com as outras coletas do dia).
+- **Ordem de grandeza**: ~25 gravações por dia na coleta normal, mais uns 5 contratos de projeto por
+  dia útil (Brasil inteiro); a carga do passado deve subir de 30 em 30 dias, um disparo por dia
+  (30, depois 60, 90, 120: o que já está guardado e não mudou não é gravado de novo).
+- **Crescimento**: os contratos de projeto não saem na limpeza; ~1.000 por ano na cópia da lista,
+  enxuta (sem os trechos do TR). Quando o mapa de preços for para o banco do Universo, eles migram.
 
 ## Próximos passos possíveis
 

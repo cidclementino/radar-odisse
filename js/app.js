@@ -80,6 +80,7 @@ const SITUACOES = {
 };
 
 function passaFiltros(c) {
+  if (NOVOS_DIA) return novoNoDia(c) && c.status_interno !== 'descartado'; // vindo do Início do Universo
   if (!(SITUACOES[filtros.situacao] || SITUACOES.ativos)(c)) return false;
 
   if (filtros.busca) {

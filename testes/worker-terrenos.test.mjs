@@ -11,8 +11,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
 const saida = join(mkdtempSync(join(tmpdir(), 'radar-')), 'worker.mjs');
-await build({ entryPoints: [join(raiz, 'worker/index.js')], bundle: true, format: 'esm', platform: 'neutral', outfile: saida, logLevel: 'warning' });
-const { default: w } = await import(pathToFileURL(saida).href);
+// cloudflare:workers só existe no Worker: no teste, um WorkerEntrypoint mínimo (guarda ctx e env)
+const stubCloudflare = { name: 'cloudflare', setup(b) {
+  b.onResolve({ filter: /^cloudflare:workers$/ }, () => ({ path: 'cf', namespace: 'stub' }));
+  b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'export class WorkerEntrypoint { constructor(ctx, env) { this.ctx = ctx; this.env = env; } }' }));
+} };
+await build({ entryPoints: [join(raiz, 'worker/index.js')], bundle: true, format: 'esm', platform: 'neutral', outfile: saida, logLevel: 'warning', plugins: [stubCloudflare] });
+const { default: w, Universo } = await import(pathToFileURL(saida).href);
 
 const kv = () => {
   const m = new Map();
@@ -94,4 +99,22 @@ test('licitações: coleta mantém a decisão do painel e o resto vem do PNCP', 
   eq(env.LICITACOES.m.has(ct.id),true,'em contato fica');
   [st,r]=await call('POST','/api/collect-licitacoes',{licitacoes:[{id:'pncpc-z',fase:'contratada',fonte:'pncp.gov.br'}]},'s'); eq(r.ignoradas,1,'não volta');
   eq(JSON.parse(env.LICITACOES.m.get('_lista')).itens['pncpc-z'],undefined,'fora da lista');
+});
+
+test('Universo.novidades conta o que entrou no dia (Brasília), com as regras das páginas', async () => {
+  const e = { CONCURSOS: kv(), OPORTUNIDADES: kv(), LICITACOES: kv() };
+  const p = (k, id, x) => e[k].m.set(id, JSON.stringify({ id, ...x }));
+  // 19/11 em Brasília: de 03:00Z do dia 19 até 02:59Z do dia 20
+  p('CONCURSOS', 'c1', { coletado_em: '2026-11-19T10:00:00Z' });
+  p('CONCURSOS', 'c2', { coletado_em: '2026-11-20T02:30:00Z' });            // 23h30 do dia 19
+  p('CONCURSOS', 'c3', { coletado_em: '2026-11-19T02:30:00Z' });            // 23h30 do dia 18
+  p('CONCURSOS', 'c4', { coletado_em: '2026-11-19T10:00:00Z', status_interno: 'descartado' });
+  p('OPORTUNIDADES', 'o1', { coletado_em: '2026-11-19T12:00:00Z', status_interno: 'monitorando' });
+  p('OPORTUNIDADES', 'o2', { coletado_em: '2026-11-19T12:00:00Z', status_interno: 'no_funil' });
+  p('LICITACOES', 'l1', { coletado_em: '2026-11-19T12:00:00Z', fase: 'aberta' });
+  p('LICITACOES', 'l2', { coletado_em: '2026-11-19T12:00:00Z', fase: 'contratada', tipo_objeto: 'obra' });
+  p('LICITACOES', 'l3', { coletado_em: '2026-11-19T12:00:00Z', fase: 'contratada', tipo_objeto: 'projeto' }); // mapa de preços
+  p('LICITACOES', 'l4', { coletado_em: '2026-11-18T12:00:00Z', fase: 'aberta' });
+  const u = new Universo({ waitUntil() {} }, e);
+  eq(await u.novidades('2026-11-19'), { dia: '2026-11-19', concursos: 2, terrenos: 1, licitacoes: 1, contratos: 1 }, 'contagem');
 });

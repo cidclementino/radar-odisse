@@ -158,6 +158,32 @@ function avisar(texto) {
   el.hidden = !texto;
 }
 
+// ---------------------------------------------------------------- novos de um dia
+// O Início do Universo leva às páginas com ?novos=AAAA-MM-DD: a lista mostra só o que entrou naquele dia
+// (coletado_em = primeira coleta, em Brasília), com as mesmas regras da contagem (worker: Universo.novidades).
+
+const NOVOS_DIA = (() => {
+  try { const d = new URLSearchParams(location.search).get('novos') || ''; return /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : ''; } catch { return ''; }
+})();
+function diaBrasilia(iso) {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(t);
+}
+const novoNoDia = item => !!NOVOS_DIA && !!item?.coletado_em && diaBrasilia(item.coletado_em) === NOVOS_DIA;
+
+if (NOVOS_DIA) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const filtros = document.querySelector('.filtros');
+    if (!filtros) return;
+    const [a, m, d] = NOVOS_DIA.split('-');
+    const el = document.createElement('p');
+    el.className = 'aviso';
+    el.innerHTML = `Só o que entrou em ${d}/${m}/${a}. <a href="${location.pathname}">Ver todos</a>`;
+    filtros.before(el);
+  });
+}
+
 // ---------------------------------------------------------------- texto e data
 
 function escapeHTML(str) {

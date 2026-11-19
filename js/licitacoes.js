@@ -25,7 +25,8 @@ const ESFERA = { F: 'Federal', E: 'Estadual', M: 'Municipal', D: 'Distrital' };
 
 let licitacoes = [];
 let vistaAtual = () => 'cartoes';
-let fase = prefLer('licitacoes:fase', 'abertas');
+// ?fase=abertas|contratadas (vindo do Início do Universo) escolhe a aba
+let fase = (() => { try { const f = new URLSearchParams(location.search).get('fase'); if (f === 'abertas' || f === 'contratadas') return f; } catch { /* segue */ } return prefLer('licitacoes:fase', 'abertas'); })();
 
 const ehContratada = l => l.fase === 'contratada';
 const ehProjetoContratado = l => ehContratada(l) && l.tipo_objeto === 'projeto';
@@ -102,6 +103,7 @@ let filtros = filtrosDe(fase);
 const CAMPOS = { busca: 'f-busca', situacao: 'f-situacao', prazo: 'f-prazo', nivel: 'f-nivel', tipo: 'f-tipo', escopo: 'f-escopo', uf: 'f-uf', modalidade: 'f-modalidade' };
 
 function passa(l) {
+  if (NOVOS_DIA) return novoNoDia(l) && l.status_interno !== 'descartado' && !ehProjetoContratado(l); // vindo do Início do Universo
   const descartada = l.status_interno === 'descartado';
   const fora = descartada || (!ehContratada(l) && encerrada(l));
   if (filtros.situacao === 'ativas' && fora) return false;

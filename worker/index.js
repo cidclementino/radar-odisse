@@ -53,6 +53,7 @@ import { processarCandidatosCorretor } from './dedup-terrenos.js';
 import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
 import { coletarLicitacoes, patchLicitacao, limparLicitacoes, lerLicitacao } from './licitacoes.js';
+import { WorkerEntrypoint } from 'cloudflare:workers';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -810,4 +811,38 @@ async function rotear(request, env, ctx) {
     }
 
     return json({ error: 'não encontrado' }, 404);
+}
+
+// ---------------------------------------------------------------- Universo (Worker a Worker)
+// O Início do Universo mostra as novidades do dia (Cid, 19/11): quantos concursos, terrenos, licitações
+// e contratos de obra entraram hoje (coletado_em = data da primeira coleta, em Brasília). Conta com as
+// mesmas regras do filtro ?novos=AAAA-MM-DD das páginas (js/comum.js), para o número bater com a lista.
+// Ligação no universo-hub: [[services]] RADAR → radar-odisse, entrypoint "Universo". Sem senha: só outro
+// Worker da mesma conta alcança este ponto de entrada.
+const TZ_BR = 'America/Sao_Paulo';
+const diaBR = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ_BR, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+const OCULTOS_TERRENO = new Set(['descartado', 'abordado', 'no_funil']);
+
+export class Universo extends WorkerEntrypoint {
+  async novidades(dia) {
+    const alvo = /^\d{4}-\d{2}-\d{2}$/.test(dia || '') ? dia : diaBR(new Date());
+    const doDia = (x) => {
+      if (!x || !x.coletado_em) return false;
+      const t = new Date(x.coletado_em);
+      return !Number.isNaN(t.getTime()) && diaBR(t) === alvo;
+    };
+    const [concursos, terrenos, licitacoes] = await Promise.all([
+      listarRapido(this.env.CONCURSOS, this.ctx, false),
+      listarRapido(this.env.OPORTUNIDADES, this.ctx, false),
+      listarRapido(this.env.LICITACOES, this.ctx, false),
+    ]);
+    const lic = licitacoes.filter((l) => doDia(l) && l.status_interno !== 'descartado');
+    return {
+      dia: alvo,
+      concursos: concursos.filter((c) => doDia(c) && c.status_interno !== 'descartado').length,
+      terrenos: terrenos.filter((o) => doDia(o) && !OCULTOS_TERRENO.has(o.status_interno)).length,
+      licitacoes: lic.filter((l) => l.fase !== 'contratada').length,
+      contratos: lic.filter((l) => l.fase === 'contratada' && l.tipo_objeto !== 'projeto').length,
+    };
+  }
 }

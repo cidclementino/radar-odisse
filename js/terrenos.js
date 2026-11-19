@@ -49,6 +49,7 @@ const FILTROS_OP_PADRAO = { busca: '', situacao: 'monitorando', nivel: '', categ
 let filtrosOp = { ...FILTROS_OP_PADRAO, ...prefLer('terrenos:filtros', {}), busca: '' };
 
 function passaOp(op) {
+  if (NOVOS_DIA) return novoNoDia(op) && !STATUS_OCULTOS.has(op.status_interno); // vindo do Início do Universo
   if (filtrosOp.situacao === 'monitorando' && STATUS_OCULTOS.has(op.status_interno)) return false;
   if (filtrosOp.situacao === 'ocultas' && !STATUS_OCULTOS.has(op.status_interno)) return false;
   if (filtrosOp.busca) {

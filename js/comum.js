@@ -122,7 +122,7 @@ function cacheIdade(chave) {
 // O leitor do site oficial (extrair-site.js + site-oficial.js) só é usado ao clicar em "Acompanhar".
 // Na página de Monitoramento geral ele é baixado nessa hora, e não a cada abertura da página.
 
-const LEITOR_SITE = ['js/extrair-site.js?v=7f86806a4e', 'js/site-oficial.js?v=dff3b3dec1']; // versões: scripts/versionar.py
+const LEITOR_SITE = ['js/extrair-site.js?v=7f86806a4e', 'js/site-oficial.js?v=3123b777c1']; // versões: scripts/versionar.py
 let leitorSite = null;
 function garantirLeitorSite() {
   if (typeof lerSiteOficial === 'function') return Promise.resolve();

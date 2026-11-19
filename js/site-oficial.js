@@ -42,7 +42,7 @@ async function lerSiteOficial(c) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         acompanhamento: { ...(c.acompanhamento || {}), site, erro, lido_em: new Date().toISOString() },
-        completar: { imagem_url: p.imagem_url, inscricao_fim: p.inscricao_fim, entrega_fim: p.entrega_fim, resultado_previsto: p.resultado_previsto },
+        completar: { imagem_url: p.imagem_url, inscricao_fim: p.inscricao_fim, entrega_fim: p.entrega_fim, resultado_previsto: p.resultado_previsto, contratacao: p.contratacao },
       }),
     });
     if (!res.ok) throw new Error(`o Radar não gravou a leitura (${res.status})`);

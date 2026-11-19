@@ -102,7 +102,12 @@ let filtros = filtrosDe(fase);
 
 const CAMPOS = { busca: 'f-busca', situacao: 'f-situacao', prazo: 'f-prazo', nivel: 'f-nivel', tipo: 'f-tipo', escopo: 'f-escopo', uf: 'f-uf', modalidade: 'f-modalidade' };
 
+// Vindo do Mapa de preços do Universo (?id=…): só aquele contrato, com o filtro de projeto.
+const SO_ID = (() => { try { return new URLSearchParams(location.search).get('id') || null; } catch { return null; } })();
+if (SO_ID && fase === 'contratadas') filtros.tipo = 'projeto';
+
 function passa(l) {
+  if (SO_ID) return l.id === SO_ID;
   if (NOVOS_DIA) return novoNoDia(l) && l.status_interno !== 'descartado' && !ehProjetoContratado(l); // vindo do Início do Universo
   const descartada = l.status_interno === 'descartado';
   const fora = descartada || (!ehContratada(l) && encerrada(l));

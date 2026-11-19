@@ -24,6 +24,7 @@
 //   POST   /api/collect-terrenos   -> recebe { oportunidades, corretoresCandidatos } de um parser de Terrenos
 //   GET    /api/licitacoes         -> lista as Licitações (PNCP)
 //   GET    /api/licitacoes/:id     -> o registro inteiro de uma Licitação (com os trechos do termo de referência)
+//   GET    /api/licitacoes/:id/pncp?url= -> arquivo ou lista de arquivos do PNCP desta licitação (leitura do TR no painel)
 //   PATCH  /api/licitacoes/:id     -> situação e observações de uma Licitação
 //   POST   /api/collect-licitacoes -> recebe { licitacoes } da coleta do PNCP, em lotes de até 50 (segredo da coleta)
 //   POST   /api/manutencao/limpar-licitacoes -> apaga encerradas antigas e contratadas velhas ou descartadas (idem)
@@ -52,7 +53,7 @@ import { repararDatas, dataValida } from './datas.js';
 import { processarCandidatosCorretor } from './dedup-terrenos.js';
 import { patchCorretor, criarCorretorManual, patchOportunidade, criarOportunidadeManual } from './terrenos.js';
 import { planejar, criarProjeto } from './projetos.js';
-import { coletarLicitacoes, patchLicitacao, limparLicitacoes, lerLicitacao } from './licitacoes.js';
+import { coletarLicitacoes, patchLicitacao, limparLicitacoes, lerLicitacao, arquivoPncp } from './licitacoes.js';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 
 const CORS_HEADERS = {
@@ -803,6 +804,10 @@ async function rotear(request, env, ctx) {
       return limparLicitacoes(env, json);
     }
     const matchLicitacao = url.pathname.match(/^\/api\/licitacoes\/([^/]+)$/);
+    const matchPncp = url.pathname.match(/^\/api\/licitacoes\/([^/]+)\/pncp$/);
+    if (request.method === 'GET' && matchPncp) {
+      return arquivoPncp(env, decodeURIComponent(matchPncp[1]), url.searchParams.get('url'), json, CORS_HEADERS);
+    }
     if (request.method === 'GET' && matchLicitacao) {
       return lerLicitacao(env, decodeURIComponent(matchLicitacao[1]), json);
     }

@@ -380,6 +380,74 @@ async function carregarTrechos(el, l) {
   }
 }
 
+// ---------------------------------------------------------------- ler o TR no painel
+// Como a leitura do site oficial dos concursos: o navegador busca os arquivos e o PDF pelo Worker
+// (GET /api/licitacoes/:id/pncp, que só repassa do PNCP), lê com o pdf.js (js/vendor/pdfjs) e o
+// js/ler-tr.js — o mesmo da coleta — e grava o resultado na licitação (PATCH documentos e tr).
+
+const lendoTR = new Set();
+let pdfjs = null;
+
+async function doPncp(l, url, tipo) {
+  const res = await fetch(`${WORKER}/api/licitacoes/${encodeURIComponent(l.id)}/pncp?url=${encodeURIComponent(url)}`);
+  if (!res.ok) { const r = await res.json().catch(() => ({})); throw new Error(r.error || `o Radar respondeu ${res.status}`); }
+  return tipo === 'json' ? res.json() : res.arrayBuffer();
+}
+
+/** "08778326000156-2-000025/2026" ou "pncp-08778326000156-1-000095-2026" → caminho da API do PNCP */
+function caminhoPncp(numero, tipo) {
+  const m = String(numero || '').match(/(\d{14})-[12]-0*(\d+)[/-](\d{4})$/);
+  return m ? `https://pncp.gov.br/api/pncp/v1/orgaos/${m[1]}/${tipo}/${m[3]}/${m[2]}/arquivos` : null;
+}
+
+async function textoDoPdf(bytes) {
+  if (!pdfjs) {
+    pdfjs = await import(new URL('js/vendor/pdfjs/pdf.min.mjs', location.href).href);
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('js/vendor/pdfjs/pdf.worker.min.mjs', location.href).href;
+  }
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+  const partes = [];
+  for (let n = 1; n <= Math.min(doc.numPages, 80); n++) {
+    const pagina = await doc.getPage(n);
+    const { items } = await pagina.getTextContent();
+    partes.push(items.map(i => i.str + (i.hasEOL ? '\n' : ' ')).join(''));
+  }
+  return partes.join('\n');
+}
+
+async function lerTermoDeReferencia(l) {
+  if (lendoTR.has(l.id)) return;
+  lendoTR.add(l.id);
+  render();
+  try {
+    let documentos = l.documentos;
+    if (!documentos?.tr) {
+      const [doContrato, daCompra] = await Promise.all([
+        caminhoPncp(l.numero_controle, 'contratos') ? doPncp(l, caminhoPncp(l.numero_controle, 'contratos'), 'json') : [],
+        caminhoPncp(l.licitacao_id, 'compras') ? doPncp(l, caminhoPncp(l.licitacao_id, 'compras'), 'json') : [],
+      ]);
+      documentos = JSON.parse(JSON.stringify({ contrato: LerTR.escolherContrato(doContrato), tr: LerTR.escolherTR(daCompra) }));
+    }
+    let tr;
+    if (!documentos.tr) {
+      tr = { legivel: false, erro: 'sem termo de referência publicado no PNCP' };
+    } else {
+      const bytes = await doPncp(l, documentos.tr.url, 'bytes');
+      const cabeca = String.fromCharCode(...new Uint8Array(bytes.slice(0, 5)));
+      if (cabeca !== '%PDF-') tr = { legivel: false, erro: cabeca.startsWith('PK') ? 'arquivo compactado ou do Word (não lido)' : 'não é PDF' };
+      else tr = LerTR.lerTR(await textoDoPdf(bytes));
+      tr.documento = documentos.tr.titulo;
+    }
+    await salvar(l, { documentos, tr });
+    notificar(tr.legivel ? (tr.area_m2 ? `Termo de referência lido: ${m2(tr.area_m2)}.` : 'Termo de referência lido, sem área achada.') : `Termo de referência não lido: ${tr.erro || 'sem texto (escaneado?)'}.`);
+  } catch (err) {
+    notificar(`Não foi possível ler o termo de referência: ${err.message}`, { erro: true });
+  } finally {
+    lendoTR.delete(l.id);
+    render();
+  }
+}
+
 function renderCartaoProjeto(l) {
   const v = l.vencedor || {};
   const el = document.createElement('article');
@@ -399,12 +467,14 @@ function renderCartaoProjeto(l) {
     ${resumoTR(l)}
     ${linksDocumentos(l) ? `<div class="licitacao__links">${linksDocumentos(l)}</div>` : ''}
     ${l.tr?.legivel ? '<details class="contratada__mais js-abrir-trechos"><summary>Trechos do termo de referência</summary><div class="js-trechos"></div></details>' : ''}
+    <button type="button" class="u-botao licitacao__ler js-ler-tr"${lendoTR.has(l.id) ? ' disabled' : ''}>${lendoTR.has(l.id) ? 'Lendo o termo de referência…' : l.tr?.legivel ? 'Ler o termo de referência de novo' : 'Ler o termo de referência'}</button>
     <details class="contratada__mais"><summary>Observações</summary>${obsCampo(l)}</details>
     <div class="oportunidade__rodape">
       <span>${escapeHTML([dinheiro(l.valor_global), l.assinatura ? `assinado ${formatarData(l.assinatura)}` : null].filter(Boolean).join(' · '))}</span>
       ${seletorSituacao(l)}
     </div>`;
   el.querySelector('.js-abrir-trechos')?.addEventListener('toggle', e => { if (e.target.open) carregarTrechos(el, l); });
+  el.querySelector('.js-ler-tr')?.addEventListener('click', () => lerTermoDeReferencia(l));
   ligarItem(el, l);
   return el;
 }

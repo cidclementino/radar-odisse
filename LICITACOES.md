@@ -150,7 +150,7 @@ contratadas), `tr` (o termo de referência) e `edital` (nas abertas). Vêm da AP
 - **Uma vez só**: a coleta pergunta ao Worker o que já tem `documentos` e só busca o resto. O Worker
   mantém `documentos` e `tr` quando a recoleta vem sem eles. Publicado há menos de 7 dias e ainda sem
   nenhum arquivo: fica para a próxima coleta tentar de novo.
-- **Leitura do TR** (só nos contratos de projeto; `lerTR` em `parsers/lib/documentos.js`): PDF de até
+- **Leitura do TR** (só nos contratos de projeto; `lerTR` em `js/ler-tr.js`, o mesmo no Node e no navegador): PDF de até
   25 MB lido com `unpdf`; tira a **área** (números com m² ou hectare; o melhor palpite é a que o texto
   diz ser "área construída/total/de intervenção…"; preço por m² e medidas não contam), as **fases**
   citadas (levantamento, estudo preliminar, anteprojeto, legal, básico, executivo, detalhamento, as built,
@@ -158,6 +158,12 @@ contratadas), `tr` (o termo de referência) e `edital` (nas abertas). Vêm da AP
   saiu cada área e o prazo ficam no registro e aparecem no cartão ("Trechos do termo de referência").
   PDF escaneado (sem texto), compactado ou do Word fica `legivel: false` com o motivo.
 - A cópia da lista leva só os valores do TR; os trechos vêm de `GET /api/licitacoes/:id` ao abrir.
+- **Ler um TR pelo painel** (Cid, 19/11): botão "Ler o termo de referência" no cartão do contrato só de
+  projeto, como a leitura do site oficial dos concursos. O navegador busca a lista de arquivos e o PDF
+  por `GET /api/licitacoes/:id/pncp?url=` (o Worker só repassa do PNCP, e só endereços do mesmo órgão do
+  item), lê com o pdf.js (`js/vendor/pdfjs`, 4.10.38) e com o mesmo `js/ler-tr.js` da coleta, e grava
+  `documentos` e `tr` pelo PATCH. Não gasta gravações da coleta: uma por clique. O Mapa de preços do
+  Universo leva ao cartão (`licitacoes?fase=contratadas&id=…`).
 - Teste à mão de um PDF: `node parsers/pncp-documentos.js <url do arquivo no PNCP>`.
 - **Node 22**: o `unpdf` usa recursos do Node 22; no Node 20 nenhum PDF abria (primeira carga). O TR que
   ficou com erro do leitor ("não abriu…") é lido de novo na coleta seguinte que pegar o item.

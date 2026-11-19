@@ -630,6 +630,7 @@ select.situacao--descartado { color: var(--tinta-2); }
 .contratada .licitacao__links .detalhe__link { margin: 0; }
 /* Contratadas só de projeto (mapa de preços): o que o termo de referência diz */
 .contratada--projeto .detalhe__grade { margin: 0 0 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.licitacao__ler { width: 100%; min-height: 34px; margin: 0 0 8px; }
 .licitacao__trecho { font-size: 12px; line-height: 1.45; margin: 6px 0; color: var(--tinta-2); }
 .tabela .licitacao__links { gap: 2px 10px; font-size: 12px; }
 .tabela .licitacao__links .detalhe__link { margin: 0; }

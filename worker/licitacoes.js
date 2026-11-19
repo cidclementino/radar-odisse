@@ -97,6 +97,40 @@ export function paraApagar(itens) {
   });
 }
 
+/**
+ * GET /api/licitacoes/:id/pncp?url= — busca no PNCP um arquivo ou a lista de arquivos da compra ou do
+ * contrato desta licitação, para o painel ler o termo de referência (o navegador não baixa do PNCP
+ * direto). Só endereços do PNCP do mesmo órgão (CNPJ) do item, para não virar um proxy aberto. O
+ * conteúdo passa direto, sem ser processado aqui (10 ms de processamento por pedido no plano gratuito).
+ */
+export async function arquivoPncp(env, id, alvo, json, cors) {
+  const l = await env.LICITACOES.get(id, 'json');
+  if (!l) return json({ error: 'licitação não encontrada' }, 404);
+  const cnpjs = new Set([l.id, l.licitacao_id, l.numero_controle].map(x => (String(x || '').match(/(\d{14})/) || [])[1]).filter(Boolean));
+  let destino;
+  try {
+    destino = new URL(alvo);
+    const m = destino.pathname.match(/^\/(api\/pncp\/v1|pncp-api\/v1)\/orgaos\/(\d{14})\/(contratos|compras)\//);
+    if (destino.protocol !== 'https:' || destino.hostname !== 'pncp.gov.br' || !m || !cnpjs.has(m[2])) {
+      return json({ error: 'endereço fora dos arquivos desta licitação no PNCP' }, 400);
+    }
+  } catch {
+    return json({ error: 'endereço inválido' }, 400);
+  }
+  let res;
+  try {
+    res = await fetch(destino.href, { headers: { 'User-Agent': 'radar.odisse.com.br (Odisse)', Accept: '*/*' } });
+  } catch (err) {
+    return json({ error: `o PNCP não respondeu: ${err.message}` }, 502);
+  }
+  if (res.status === 204) return json([], 200);
+  if (!res.ok) return json({ error: `o PNCP respondeu ${res.status}` }, 502);
+  return new Response(res.body, {
+    status: 200,
+    headers: { 'Content-Type': res.headers.get('content-type') || 'application/octet-stream', ...(res.headers.get('content-length') ? { 'Content-Length': res.headers.get('content-length') } : {}), ...cors },
+  });
+}
+
 /** GET /api/licitacoes/:id — o registro inteiro (a lista leva uma cópia enxuta). */
 export async function lerLicitacao(env, id, json) {
   const l = await env.LICITACOES.get(id, 'json');
@@ -138,8 +172,25 @@ export async function patchLicitacao(request, env, id, json) {
     if (t.length > 4000) return json({ error: 'observações maiores que 4000 caracteres' }, 400);
     atualizado.observacoes = t || null;
   }
-  if (!('status_interno' in corpo) && !('observacoes' in corpo)) {
-    return json({ error: 'nada pra atualizar — envie status_interno e/ou observacoes' }, 400);
+  // Leitura do termo de referência feita no painel (botão "Ler o termo de referência"): o navegador
+  // baixa o PDF por GET /api/licitacoes/:id/pncp, lê (js/ler-tr.js) e grava aqui.
+  if ('documentos' in corpo) {
+    const d = corpo.documentos;
+    const docOk = x => x == null || (typeof x === 'object' && typeof x.url === 'string' && x.url.startsWith('https://pncp.gov.br/'));
+    if (!d || typeof d !== 'object' || Array.isArray(d) || !['contrato', 'tr', 'edital'].every(k => docOk(d[k])) || JSON.stringify(d).length > 4000) {
+      return json({ error: 'documentos: { contrato, tr, edital } com links do PNCP' }, 400);
+    }
+    atualizado.documentos = d;
+  }
+  if ('tr' in corpo) {
+    const t = corpo.tr;
+    if (t !== null && (typeof t !== 'object' || Array.isArray(t) || typeof t.legivel !== 'boolean' || JSON.stringify(t).length > 10000)) {
+      return json({ error: 'tr: esperado o resultado da leitura do termo de referência' }, 400);
+    }
+    atualizado.tr = t;
+  }
+  if (!['status_interno', 'observacoes', 'documentos', 'tr'].some(k => k in corpo)) {
+    return json({ error: 'nada pra atualizar — envie status_interno, observacoes, documentos ou tr' }, 400);
   }
   atualizado.atualizado_em = new Date().toISOString();
   await env.LICITACOES.put(id, JSON.stringify(atualizado));

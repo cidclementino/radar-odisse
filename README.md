@@ -5,7 +5,7 @@
 
 Este repositório ficou com as coletas (`scripts/`, GitHub Actions), o servidor (`worker/`, Worker `radar-odisse`), os testes
 e `radar.odisse.com.br`, que só redireciona cada página antiga para o mesmo lugar em `universo.odisse.com.br/radar/`.
-`js/extrair-site.js` fica aqui porque as coletas e os testes o usam; a tela tem a sua cópia em `universo-odisse/radar/js/`.
+`js/extrair-site.js` e `js/ler-tr.js` ficam aqui porque as coletas e os testes os usam; a tela tem as suas cópias em `universo-odisse/radar/js/` (mudou lá, mude aqui).
 
 ---
 

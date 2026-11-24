@@ -1,125 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Terrenos — Radar Odisse</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
-<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
-<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=36540afb65">
-<script src="js/auth.js?v=72f6ee79ac"></script>
-<script>exigirAutenticacao();</script>
-  <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
-  <script type="speculationrules">
-  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/licitacoes"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
-  </script>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Radar — agora no Universo</title>
+<script>
+  // Desde 24/11/2026 o Radar mora no Universo: universo.odisse.com.br/radar/ (mesma senha da equipe).
+  (function () {
+    var p = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (p === 'index' || p === '404') p = '';
+    var destino = p === 'login' ? '/' : '/radar/' + p;
+    location.replace('https://universo.odisse.com.br' + destino + location.search + location.hash);
+  })();
+</script>
 </head>
-<body class="u-pagina">
-
-  <header class="topo" data-pagina="terrenos"></header>
-
-  <main class="pagina">
-    <div class="pagina__barra">
-      <h1>Terrenos</h1>
-      <div class="vista" id="vista" role="group" aria-label="Visualização">
-        <button type="button" data-vista="cartoes">Cartões</button>
-        <button type="button" data-vista="lista">Lista</button>
-      </div>
-      <div class="pagina__estado">
-        <span class="atualizado" id="updated-at"></span>
-        <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
-      </div>
-    </div>
-    <p class="pagina__intro">Sinais de terrenista e de corretor coletados no OLX, no ZAP Imóveis e no YouTube, por nível de maturidade: terrenos e imóveis para retrofit (prédio inteiro, galpão, casarão, imóvel comercial à venda). O sistema registra o sinal; a leitura de abordagem é manual. O lápis corrige ou completa terrenos e corretores, e o que for corrigido à mão a coleta não mexe mais.</p>
-
-    <section aria-labelledby="titulo-oportunidades">
-      <div class="secao__cabeca">
-        <h2 class="secao__titulo" id="titulo-oportunidades">Oportunidades</h2>
-        <button type="button" class="u-botao" id="novo-terreno">Novo terreno</button>
-      </div>
-      <div class="filtros">
-        <input type="search" id="f-busca" placeholder="Buscar no título ou no local" aria-label="Buscar oportunidades">
-        <select id="f-situacao" aria-label="Situação">
-          <option value="monitorando">Em monitoramento</option>
-          <option value="todas">Todas as situações</option>
-          <option value="ocultas">Descartadas ou no funil</option>
-        </select>
-        <select id="f-nivel" aria-label="Nível de maturidade">
-          <option value="">Todos os níveis</option>
-          <option value="3">Nível 3 · Processo aberto</option>
-          <option value="2">Nível 2 · Qualificado</option>
-          <option value="2+">Nível 2 ou 3</option>
-          <option value="1">Nível 1 · Observação</option>
-        </select>
-        <select id="f-categoria" aria-label="Terreno ou imóvel">
-          <option value="">Terrenos e imóveis</option>
-          <option value="terreno">Terrenos</option>
-          <option value="imovel">Imóveis para retrofit</option>
-        </select>
-        <select id="f-persona" aria-label="Persona">
-          <option value="">Terrenistas e corretores</option>
-          <option value="terrenista">Terrenistas</option>
-          <option value="corretor">Corretores</option>
-        </select>
-        <select id="f-cidade" aria-label="Cidade ou região"></select>
-        <select id="f-fonte" aria-label="Fonte"></select>
-        <select id="f-periodo" aria-label="Período da coleta">
-          <option value="">Coletadas em qualquer data</option>
-          <option value="7">Coletadas nos últimos 7 dias</option>
-          <option value="30">Nos últimos 30 dias</option>
-          <option value="90">Nos últimos 90 dias</option>
-        </select>
-        <button type="button" class="filtros__limpar" id="f-limpar" hidden>Limpar filtros</button>
-      </div>
-
-      <p class="aviso" id="aviso" hidden></p>
-      <p class="resumo" id="resumo"></p>
-
-      <div class="grade grade--compacta" id="stack-oportunidades" aria-live="polite"></div>
-      <div class="lista" id="lista-oportunidades" aria-live="polite" hidden></div>
-      <p class="vazio" id="empty-state" hidden>Nenhuma oportunidade com esses filtros.</p>
-    </section>
-
-    <section class="secao" id="section-corretores" aria-labelledby="titulo-corretores">
-      <div class="secao__cabeca">
-        <h2 class="secao__titulo" id="titulo-corretores">Corretores</h2>
-        <button type="button" class="u-botao" id="novo-corretor">Novo corretor</button>
-      </div>
-      <p class="pagina__intro">Perfis acumulados a partir do YouTube e do ZAP Imóveis. Contatos lidos das descrições dos vídeos e canais. Fusão pelo canal, nome, CRECI e empresa.</p>
-      <div class="filtros">
-        <input type="search" id="c-busca" placeholder="Buscar por nome, empresa, CRECI ou contato" aria-label="Buscar corretores">
-        <select id="c-situacao" aria-label="Situação">
-          <option value="ativos">Ativos</option>
-          <option value="todos">Ativos e descartados</option>
-          <option value="descartados">Descartados</option>
-        </select>
-        <select id="c-nivel" aria-label="Nível de maturidade">
-          <option value="">Todos os níveis</option>
-          <option value="3">Nível 3 · Processo aberto</option>
-          <option value="2">Nível 2 · Qualificado</option>
-          <option value="2+">Nível 2 ou 3</option>
-          <option value="1">Nível 1 · Observação</option>
-        </select>
-        <select id="c-regiao" aria-label="Região de atuação"></select>
-        <select id="c-via" aria-label="Descoberto via"></select>
-        <select id="c-creci" aria-label="CRECI">
-          <option value="">Com ou sem CRECI</option>
-          <option value="com">Com CRECI informado</option>
-          <option value="sem">Sem CRECI</option>
-        </select>
-        <button type="button" class="filtros__limpar" id="c-limpar" hidden>Limpar filtros</button>
-      </div>
-      <p class="resumo" id="resumo-corretores"></p>
-      <div class="corretores" id="corretor-list" aria-live="polite"></div>
-      <div class="lista" id="lista-corretores" hidden></div>
-      <div class="carregar-mais" id="corretor-load-more"></div>
-    </section>
-  </main>
-
-  <script src="js/comum.js?v=65dc30b4b8"></script>
-  <script src="js/terrenos.js?v=861389cf89"></script>
-</body>
+<body><p>O Radar agora fica no <a href="https://universo.odisse.com.br/radar/">Universo</a>.</p></body>
 </html>

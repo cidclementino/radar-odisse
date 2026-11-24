@@ -1,3 +1,14 @@
+# Radar — coletas e servidor
+
+**As telas do Radar moram no Universo desde 24/11/2026: https://universo.odisse.com.br/radar/**
+(repositório `universo-odisse`, pasta `radar/`; login único com a senha da equipe; menu lateral da `base/v2`).
+
+Este repositório ficou com as coletas (`scripts/`, GitHub Actions), o servidor (`worker/`, Worker `radar-odisse`), os testes
+e `radar.odisse.com.br`, que só redireciona cada página antiga para o mesmo lugar em `universo.odisse.com.br/radar/`.
+`js/extrair-site.js` fica aqui porque as coletas e os testes o usam; a tela tem a sua cópia em `universo-odisse/radar/js/`.
+
+---
+
 # Radar Odisse
 
 Painel interno com três abas: **Concursos** (editais de arquitetura/design),

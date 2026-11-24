@@ -1,87 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Concursos — Radar Odisse</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
-<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
-<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=36540afb65">
-<script src="js/auth.js?v=72f6ee79ac"></script>
-<script>exigirAutenticacao();</script>
-  <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
-  <script type="speculationrules">
-  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/licitacoes"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
-  </script>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Radar — agora no Universo</title>
+<script>
+  // Desde 24/11/2026 o Radar mora no Universo: universo.odisse.com.br/radar/ (mesma senha da equipe).
+  (function () {
+    var p = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (p === 'index' || p === '404') p = '';
+    var destino = p === 'login' ? '/' : '/radar/' + p;
+    location.replace('https://universo.odisse.com.br' + destino + location.search + location.hash);
+  })();
+</script>
 </head>
-<body class="u-pagina">
-
-  <header class="topo" data-pagina="concursos"></header>
-
-  <main class="pagina">
-    <div class="pagina__barra">
-      <h1>Concursos</h1>
-      <nav class="subnav" id="subnav" aria-label="Páginas de Concursos"></nav>
-      <div class="vista" id="vista" role="group" aria-label="Visualização">
-        <button type="button" data-vista="cartoes">Cartões</button>
-        <button type="button" data-vista="lista">Lista</button>
-      </div>
-      <div class="pagina__estado">
-        <span class="atualizado" id="updated-at"></span>
-        <button type="button" class="u-botao" id="recarregar" title="Buscar de novo no Radar, ignorando a cópia guardada">Recarregar</button>
-      </div>
-    </div>
-
-    <div class="filtros" id="filtros">
-      <input type="search" id="f-busca" placeholder="Buscar nome, promotor, local" aria-label="Buscar">
-      <select id="f-situacao" aria-label="Situação">
-        <option value="ativos">Monitoramento ativo</option>
-        <option value="novos">Novos (últimos 7 dias)</option>
-        <option value="arquivados">Arquivados e encerrados</option>
-        <option value="todos">Todas as situações</option>
-      </select>
-      <select id="f-prazo" aria-label="Prazo de inscrição">
-        <option value="">Qualquer prazo</option>
-        <option value="15">Em até 15 dias</option>
-        <option value="45">Em 16 a 45 dias</option>
-        <option value="mais">Em mais de 45 dias</option>
-        <option value="sem">Sem prazo informado</option>
-      </select>
-      <select id="f-escopo" aria-label="Escopo"></select>
-      <select id="f-tipo" aria-label="Abrangência">
-        <option value="">Nacional ou internacional</option>
-        <option value="nacional">Nacionais</option>
-        <option value="internacional">Internacionais</option>
-      </select>
-      <select id="f-inscricao" aria-label="Inscrição">
-        <option value="">Gratuita ou paga</option>
-        <option value="gratuita">Inscrição gratuita</option>
-        <option value="paga">Inscrição paga</option>
-      </select>
-      <select id="f-fonte" aria-label="Fonte"></select>
-      <button type="button" class="filtros__limpar" id="f-limpar" hidden>Limpar filtros</button>
-    </div>
-
-    <p class="aviso" id="aviso" hidden></p>
-    <p class="resumo" id="resumo"></p>
-
-    <div class="grade" id="stack" aria-live="polite"></div>
-    <div class="lista" id="lista" aria-live="polite" hidden></div>
-    <p class="vazio" id="empty-state" hidden>Nenhum concurso com esses filtros.</p>
-  </main>
-
-  <div class="selecao" id="selecao" hidden>
-    <span id="selecao-texto"></span>
-    <button type="button" class="u-botao forte" id="selecao-fundir">Fundir os dois</button>
-    <button type="button" class="filtros__limpar" id="selecao-limpar">Limpar seleção</button>
-  </div>
-
-  <dialog class="fusao" id="fusao" aria-labelledby="fusao-titulo"></dialog>
-
-  <script src="js/comum.js?v=65dc30b4b8"></script>
-  <script src="js/app.js?v=e4582d404e"></script>
-</body>
+<body><p>O Radar agora fica no <a href="https://universo.odisse.com.br/radar/">Universo</a>.</p></body>
 </html>

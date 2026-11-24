@@ -1,54 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Acompanhamento de concursos — Radar Odisse</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
-<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
-<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=36540afb65">
-<script src="js/auth.js?v=72f6ee79ac"></script>
-<script>exigirAutenticacao();</script>
-  <!-- pré-carrega a outra página do Radar quando o cursor para sobre o link: a troca fica instantânea (Chrome e Edge) -->
-  <script type="speculationrules">
-  {"prerender": [{"where": {"or": [{"href_matches": "/"}, {"href_matches": "/terrenos"}, {"href_matches": "/licitacoes"}, {"href_matches": "/acompanhamento"}, {"href_matches": "/revisao"}, {"href_matches": "/*.html"}]}, "eagerness": "moderate"}]}
-  </script>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Radar — agora no Universo</title>
+<script>
+  // Desde 24/11/2026 o Radar mora no Universo: universo.odisse.com.br/radar/ (mesma senha da equipe).
+  (function () {
+    var p = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (p === 'index' || p === '404') p = '';
+    var destino = p === 'login' ? '/' : '/radar/' + p;
+    location.replace('https://universo.odisse.com.br' + destino + location.search + location.hash);
+  })();
+</script>
 </head>
-<body class="u-pagina">
-
-  <header class="topo" data-pagina="concursos"></header>
-
-  <main class="pagina">
-    <div class="pagina__barra">
-      <h1>Concursos</h1>
-      <nav class="subnav" id="subnav" aria-label="Páginas de Concursos"></nav>
-      <div class="pagina__estado">
-        <button type="button" class="u-botao" id="recarregar">Recarregar</button>
-      </div>
-    </div>
-    <p class="pagina__intro">Concursos escolhidos para acompanhar de perto. O Radar lê o site oficial de cada um (e as páginas de regras, prêmios e cronograma que encontrar) e mostra aqui o que achou. Os trechos vêm do próprio site: confira lá antes de decidir. A leitura se repete toda semana, na coleta.</p>
-
-    <div class="filtros">
-      <select id="f-situacao" aria-label="Situação">
-        <option value="todos">Acompanhando e inscritos</option>
-        <option value="acompanhando">Só acompanhando</option>
-        <option value="inscrito">Só inscritos</option>
-      </select>
-      <label class="filtros__check"><input type="checkbox" id="f-encerrados"> Mostrar com inscrições encerradas</label>
-    </div>
-
-    <p class="aviso" id="aviso" hidden></p>
-    <p class="resumo" id="resumo"></p>
-    <div class="acompanhados" id="acompanhados"></div>
-    <p class="vazio" id="vazio" hidden>Nenhum concurso em acompanhamento. No monitoramento geral, use “Acompanhar” no cartão ou a coluna Situação na lista.</p>
-  </main>
-
-  <script src="js/comum.js?v=65dc30b4b8"></script>
-  <script src="js/extrair-site.js?v=7f86806a4e"></script>
-  <script src="js/site-oficial.js?v=3123b777c1"></script>
-  <script src="js/acompanhamento.js?v=057868a774"></script>
-</body>
+<body><p>O Radar agora fica no <a href="https://universo.odisse.com.br/radar/">Universo</a>.</p></body>
 </html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Radar — agora no Universo</title>
+<script>
+  // Desde 24/11/2026 o Radar mora no Universo: universo.odisse.com.br/radar/ (mesma senha da equipe).
+  (function () {
+    var p = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (p === 'index' || p === '404') p = '';
+    var destino = p === 'login' ? '/' : '/radar/' + p;
+    location.replace('https://universo.odisse.com.br' + destino + location.search + location.hash);
+  })();
+</script>
+</head>
+<body><p>O Radar agora fica no <a href="https://universo.odisse.com.br/radar/">Universo</a>.</p></body>
+</html>

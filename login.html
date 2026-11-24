@@ -1,60 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Entrar · Radar — Odisse</title>
-<meta name="robots" content="noindex, nofollow">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon.svg" type="image/svg+xml">
-<link rel="icon" href="https://marca.odisse.com.br/favicon/favicon-32x32.png" sizes="32x32">
-<link rel="stylesheet" href="https://marca.odisse.com.br/v1/marca.css">
-<link rel="stylesheet" href="https://universo.odisse.com.br/base/v1/universo.css">
-<link rel="stylesheet" href="css/styles.css?v=36540afb65">
-</head>
-<body class="u-pagina">
-
-<main class="gate">
-  <form class="gate__card" id="gate-form" autocomplete="off">
-    <div class="gate__marca"><span class="gate__selo" aria-hidden="true"></span><span class="gate__logotipo" role="img" aria-label="Odisse"></span></div>
-    <p class="gate__rotulo">Radar</p>
-    <label class="gate__field">
-      <span>Senha</span>
-      <input type="password" id="gate-password" autocomplete="current-password" required autofocus>
-    </label>
-    <label class="gate__field">
-      <span>Seu nome</span>
-      <input type="text" id="gate-name" placeholder="Quem está usando" required>
-    </label>
-    <p class="gate__error" id="gate-error" role="alert" hidden>Senha incorreta. Tente novamente.</p>
-    <button type="submit" class="u-botao forte">Entrar</button>
-    <p class="gate__note">Concursos e terrenos monitorados pelo Odisse. Acesso restrito à equipe; faz parte do <a href="https://universo.odisse.com.br/">Universo</a>.</p>
-  </form>
-</main>
-
-<script src="js/auth.js?v=72f6ee79ac"></script>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Radar — agora no Universo</title>
 <script>
-  if (isAuthenticated()) location.href = paginaDeVolta();
-
-  document.getElementById('gate-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const pass = document.getElementById('gate-password').value;
-    const name = document.getElementById('gate-name').value.trim();
-    const errEl = document.getElementById('gate-error');
-    const botao = e.target.querySelector('button');
-    botao.disabled = true;
-    const r = await conferirSenha(pass);
-    botao.disabled = false;
-    if (r !== 'ok') {
-      errEl.textContent = r === 'senha'
-        ? 'Senha incorreta. Tente novamente.'
-        : 'Não consegui falar com o servidor. Confira a internet e tente de novo.';
-      errEl.hidden = false;
-      return;
-    }
-    errEl.hidden = true;
-    setAuthenticated(name, pass);
-    location.href = paginaDeVolta();
-  });
+  // Desde 24/11/2026 o Radar mora no Universo: universo.odisse.com.br/radar/ (mesma senha da equipe).
+  (function () {
+    var p = (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+    if (p === 'index' || p === '404') p = '';
+    var destino = p === 'login' ? '/' : '/radar/' + p;
+    location.replace('https://universo.odisse.com.br' + destino + location.search + location.hash);
+  })();
 </script>
-</body>
+</head>
+<body><p>O Radar agora fica no <a href="https://universo.odisse.com.br/radar/">Universo</a>.</p></body>
 </html>
